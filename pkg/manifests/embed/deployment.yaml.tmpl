@@ -45,6 +45,7 @@ spec:
       containers:
         - name: picoclaw
           image: ghcr.io/ai-agent-ship-it/picoclaw:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 18790
           envFrom:
