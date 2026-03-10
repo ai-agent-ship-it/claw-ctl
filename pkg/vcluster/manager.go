@@ -36,7 +36,7 @@ func (m *Manager) Create(ctx context.Context, name, namespace string, agentNames
 		}
 		defer os.Remove(valuesFile.Name())
 
-		valuesFile.WriteString("sync:\n  fromHost:\n    secrets:\n      enabled: true\n      mappings:\n        byName:\n          \"/*\": \"agents/*\"\n")
+		valuesFile.WriteString("sync:\n  fromHost:\n    secrets:\n      enabled: true\n      mappings:\n        byName:\n          \"\": \"agents\"\n")
 		valuesFile.Close()
 
 		args = append(args, "-f", valuesFile.Name())
