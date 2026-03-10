@@ -92,9 +92,13 @@ Can be used with:
 		}
 
 		// Set secret mode
-		if vaultAddr != "" {
+		if useVault {
+			addr, _, err := resolveVaultConfig(deployEnvFile)
+			if err != nil {
+				return err
+			}
 			cfg.Secrets.Mode = "vault"
-			cfg.Secrets.VaultAddr = vaultAddr
+			cfg.Secrets.VaultAddr = addr
 		} else if deployEnvFile != "" {
 			cfg.Secrets.Mode = "env"
 			cfg.Secrets.EnvFile = deployEnvFile
@@ -167,7 +171,11 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 	// Phase 3: Secrets
 	fmt.Println("\n  ── Phase 3: Secrets ──")
 	if cfg.Secrets.Mode == "vault" && cfg.Secrets.VaultAddr != "" {
-		vp, err := secrets.NewVaultProvisioner(cfg.Secrets.VaultAddr)
+		addr, token, err := resolveVaultConfig(cfg.Secrets.EnvFile)
+		if err != nil {
+			return err
+		}
+		vp, err := secrets.NewVaultProvisioner(addr, token)
 		if err != nil {
 			return err
 		}
