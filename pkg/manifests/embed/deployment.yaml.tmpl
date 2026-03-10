@@ -24,6 +24,7 @@ spec:
             - |
               apk add --no-cache gettext > /dev/null 2>&1
               envsubst < /config-template/config.json > /resolved-config/config.json
+              envsubst < /config-template/mcp_config.json > /resolved-config/mcp_config.json
               echo "Config resolved successfully"
           envFrom:
             - secretRef:
@@ -45,6 +46,9 @@ spec:
             - name: resolved-config
               mountPath: /home/picoclaw/.picoclaw/config.json
               subPath: config.json
+            - name: resolved-config
+              mountPath: /home/picoclaw/.picoclaw/mcp_config.json
+              subPath: mcp_config.json
             - name: workspace-data
               mountPath: /home/picoclaw/.picoclaw/workspace
             - name: workspace-files
