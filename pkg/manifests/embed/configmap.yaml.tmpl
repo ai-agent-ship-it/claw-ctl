@@ -67,7 +67,7 @@ data:
         {
           "model_name": "{{ .Model }}",
           "model": "{{ .Model }}",
-          "api_base": "{{ if .OllamaAddr }}{{ .OllamaAddr }}{{ else }}http://ollama.default.svc:11434{{ end }}",
+          "api_base": "{{ if .OllamaAddr }}{{ .OllamaAddr }}/v1{{ else }}http://ollama.default.svc:11434/v1{{ end }}",
           "api_key": "not-needed"
         }
         {{- else }}
