@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -46,7 +47,7 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-// CreateNamespace creates a namespace if it doesn't exist.
+// CreateNamespace creates a namespace (idempotent).
 func (c *Client) CreateNamespace(ctx context.Context, name string) error {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -55,13 +56,16 @@ func (c *Client) CreateNamespace(ctx context.Context, name string) error {
 	}
 	_, err := c.Clientset.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("namespace %s already exists", name)
+		}
 		return fmt.Errorf("failed to create namespace %s: %w", name, err)
 	}
 	return nil
 }
 
-// CreateSecretFromEnv creates a K8s Secret from a map of key-value pairs.
-func (c *Client) CreateSecretFromEnv(ctx context.Context, namespace, name string, data map[string]string) error {
+// EnsureSecret creates or updates a K8s Secret (idempotent).
+func (c *Client) EnsureSecret(ctx context.Context, namespace, name string, data map[string]string) (bool, error) {
 	secretData := make(map[string][]byte)
 	for k, v := range data {
 		secretData[k] = []byte(v)
@@ -82,9 +86,17 @@ func (c *Client) CreateSecretFromEnv(ctx context.Context, namespace, name string
 
 	_, err := c.Clientset.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create secret %s/%s: %w", namespace, name, err)
+		if apierrors.IsAlreadyExists(err) {
+			// Update existing secret
+			_, err = c.Clientset.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{})
+			if err != nil {
+				return false, fmt.Errorf("failed to update secret %s/%s: %w", namespace, name, err)
+			}
+			return false, nil // updated
+		}
+		return false, fmt.Errorf("failed to create secret %s/%s: %w", namespace, name, err)
 	}
-	return nil
+	return true, nil // created
 }
 
 // HealthCheck verifies connectivity to the cluster.

@@ -34,5 +34,10 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default: picoclaw.yaml)")
-	rootCmd.PersistentFlags().StringVar(&vaultAddr, "vault-addr", "", "Vault server address (optional)")
+	rootCmd.PersistentFlags().StringVar(&vaultAddr, "vault-addr", "", "Vault server address (env: VAULT_ADDR)")
+
+	// Env var fallbacks
+	if vaultAddr == "" {
+		vaultAddr = os.Getenv("VAULT_ADDR")
+	}
 }

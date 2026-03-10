@@ -17,7 +17,7 @@ func NewManager() *Manager {
 	return &Manager{}
 }
 
-// Create creates a new vCluster in the given namespace.
+// Create creates a new vCluster in the given namespace (idempotent).
 func (m *Manager) Create(ctx context.Context, name, namespace string) error {
 	fmt.Printf("  ☸️  Creating vCluster '%s' in namespace '%s'...\n", name, namespace)
 
@@ -27,7 +27,12 @@ func (m *Manager) Create(ctx context.Context, name, namespace string) error {
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("vcluster create failed: %s: %w", string(output), err)
+		outStr := string(output)
+		if strings.Contains(outStr, "already exists") || strings.Contains(outStr, "already running") {
+			fmt.Println("  ℹ️  vCluster already exists, reusing")
+			return nil
+		}
+		return fmt.Errorf("vcluster create failed: %s: %w", outStr, err)
 	}
 	fmt.Println("  ✅ vCluster created")
 	return nil
@@ -79,7 +84,7 @@ func (m *Manager) Connect(ctx context.Context, name, namespace string) error {
 	return nil
 }
 
-// Delete deletes a vCluster.
+// Delete deletes a vCluster (idempotent).
 func (m *Manager) Delete(ctx context.Context, name, namespace string) error {
 	fmt.Printf("  🗑️  Deleting vCluster '%s'...\n", name)
 
@@ -88,7 +93,12 @@ func (m *Manager) Delete(ctx context.Context, name, namespace string) error {
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("vcluster delete failed: %s: %w", string(output), err)
+		outStr := string(output)
+		if strings.Contains(outStr, "not found") || strings.Contains(outStr, "couldn't find") {
+			fmt.Println("  ℹ️  vCluster not found (already deleted)")
+			return nil
+		}
+		return fmt.Errorf("vcluster delete failed: %s: %w", outStr, err)
 	}
 	fmt.Println("  ✅ vCluster deleted")
 	return nil

@@ -2,6 +2,9 @@ package secrets
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/ai-agent-ship-it/claw-ctl/pkg/config"
 )
@@ -13,14 +16,30 @@ type VaultProvisioner struct {
 }
 
 // NewVaultProvisioner creates a new Vault provisioner.
+// Reads token from VAULT_TOKEN env or ~/.vault-token file.
 func NewVaultProvisioner(address string) (*VaultProvisioner, error) {
 	if address == "" {
-		return nil, fmt.Errorf("vault address is required")
+		return nil, fmt.Errorf("vault address is required (use --vault-addr or VAULT_ADDR)")
 	}
 
-	// TODO: Read token from ~/.vault-token or VAULT_TOKEN env
+	token := os.Getenv("VAULT_TOKEN")
+	if token == "" {
+		home, _ := os.UserHomeDir()
+		if home != "" {
+			data, err := os.ReadFile(filepath.Join(home, ".vault-token"))
+			if err == nil {
+				token = strings.TrimSpace(string(data))
+			}
+		}
+	}
+
+	if token == "" {
+		return nil, fmt.Errorf("vault token not found (set VAULT_TOKEN or login with 'vault login')")
+	}
+
 	return &VaultProvisioner{
 		Address: address,
+		Token:   token,
 	}, nil
 }
 

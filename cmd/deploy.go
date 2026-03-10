@@ -181,14 +181,14 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 			required := agent.RequiredSecrets()
 			agentSecrets := secrets.FilterSecrets(secretValues, required)
 			secretName := agent.Name + "-secret"
-			if err := k8sClient.CreateSecretFromEnv(ctx, namespace, secretName, agentSecrets); err != nil {
-				if strings.Contains(err.Error(), "already exists") {
-					fmt.Printf("  ℹ️  Secret '%s' already exists\n", secretName)
-				} else {
-					return err
-				}
-			} else {
+			created, err := k8sClient.EnsureSecret(ctx, namespace, secretName, agentSecrets)
+			if err != nil {
+				return err
+			}
+			if created {
 				fmt.Printf("  ✅ Secret '%s' created (%d keys)\n", secretName, len(agentSecrets))
+			} else {
+				fmt.Printf("  ℹ️  Secret '%s' updated (%d keys)\n", secretName, len(agentSecrets))
 			}
 		}
 	} else {
