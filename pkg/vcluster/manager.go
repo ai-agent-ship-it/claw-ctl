@@ -60,7 +60,21 @@ func (m *Manager) WaitReady(ctx context.Context, name, namespace string) error {
 	return fmt.Errorf("vcluster '%s' did not become ready within 3 minutes", name)
 }
 
-// Connect exports the vCluster kubeconfig to a file.
+// ApplyManifest applies a YAML manifest inside the vCluster using `vcluster connect -- kubectl apply`.
+// This handles the proxy/port-forward automatically without needing a kubeconfig file.
+func (m *Manager) ApplyManifest(ctx context.Context, name, namespace, manifestPath string) error {
+	cmd := exec.CommandContext(ctx, "vcluster", "connect", name,
+		"--namespace", namespace,
+		"--", "kubectl", "apply", "-f", manifestPath,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %w", strings.TrimSpace(string(output)), err)
+	}
+	return nil
+}
+
+// Connect exports the vCluster kubeconfig to a file (for status/debug use).
 // Extracts the kubeconfig from the vc-<name> Secret and base64-decodes in Go.
 func (m *Manager) Connect(ctx context.Context, name, namespace string) error {
 	fmt.Printf("  🔗 Exporting vCluster '%s' kubeconfig...\n", name)
@@ -75,32 +89,10 @@ func (m *Manager) Connect(ctx context.Context, name, namespace string) error {
 	)
 	encoded, err := cmd.Output()
 	if err == nil && len(encoded) > 0 {
-		// Decode base64 in Go (cross-platform, no shelling out)
 		decoded, err := base64.StdEncoding.DecodeString(string(encoded))
 		if err != nil {
 			return fmt.Errorf("failed to decode kubeconfig base64: %w", err)
 		}
-
-		if err := os.WriteFile(kubeconfigPath, decoded, 0600); err != nil {
-			return fmt.Errorf("failed to write kubeconfig: %w", err)
-		}
-
-		fmt.Printf("  ✅ Kubeconfig written to %s\n", kubeconfigPath)
-		return nil
-	}
-
-	// Fallback: try vc-config-<name> secret
-	configSecret := fmt.Sprintf("vc-config-%s", name)
-	cmd2 := exec.CommandContext(ctx, "kubectl", "get", "secret", configSecret,
-		"-n", namespace,
-		"-o", "jsonpath={.data.config}",
-	)
-	encoded2, err2 := cmd2.Output()
-	if err2 == nil && len(encoded2) > 0 {
-		decoded, err := base64.StdEncoding.DecodeString(string(encoded2))
-		if err != nil {
-			return fmt.Errorf("failed to decode kubeconfig base64: %w", err)
-		}
 		if err := os.WriteFile(kubeconfigPath, decoded, 0600); err != nil {
 			return fmt.Errorf("failed to write kubeconfig: %w", err)
 		}
@@ -108,8 +100,7 @@ func (m *Manager) Connect(ctx context.Context, name, namespace string) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not find kubeconfig in secrets '%s' or '%s' in namespace '%s'",
-		secretName, configSecret, namespace)
+	return fmt.Errorf("could not find kubeconfig in secret '%s' in namespace '%s'", secretName, namespace)
 }
 
 // Delete deletes a vCluster (idempotent).

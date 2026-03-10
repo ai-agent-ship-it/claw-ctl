@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/ai-agent-ship-it/claw-ctl/pkg/config"
@@ -203,11 +202,8 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 		fmt.Println("  ⚠️  No secrets configured (mode: manual)")
 	}
 
-	// Phase 4: Connect + apply manifests
+	// Phase 4: Apply manifests inside vCluster
 	fmt.Println("\n  ── Phase 4: Agent Manifests ──")
-	if err := vcm.Connect(ctx, cfg.Cluster, namespace); err != nil {
-		return err
-	}
 
 	for _, agent := range cfg.Agents {
 		fmt.Printf("  📦 Deploying agent '%s' (%s)...\n", agent.Name, agent.Model)
@@ -216,43 +212,33 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 			return fmt.Errorf("failed to render manifests for %s: %w", agent.Name, err)
 		}
 
-		// Apply each manifest via kubectl with vCluster kubeconfig
-		kubeconfig := vcluster.KubeconfigPath(cfg.Cluster)
-		for name, content := range rendered {
-			if err := applyManifest(ctx, kubeconfig, content); err != nil {
-				fmt.Printf("  ⚠️  Failed to apply %s for %s: %v\n", name, agent.Name, err)
+		// Write all manifests to a single temp file and apply via vcluster connect
+		tmpFile, err := os.CreateTemp("", fmt.Sprintf("claw-ctl-%s-*.yaml", agent.Name))
+		if err != nil {
+			return fmt.Errorf("failed to create temp file: %w", err)
+		}
+		tmpPath := tmpFile.Name()
+
+		// Write all manifests separated by ---
+		order := []string{"namespace", "rbac", "pvc", "configmap", "deployment", "service", "ingress"}
+		for _, key := range order {
+			if content, ok := rendered[key]; ok {
+				tmpFile.WriteString("---\n")
+				tmpFile.WriteString(content)
+				tmpFile.WriteString("\n")
 			}
 		}
-		fmt.Printf("  ✅ Agent '%s' deployed\n", agent.Name)
+		tmpFile.Close()
+
+		if err := vcm.ApplyManifest(ctx, cfg.Cluster, namespace, tmpPath); err != nil {
+			fmt.Printf("  ⚠️  Failed to apply manifests for %s: %v\n", agent.Name, err)
+		} else {
+			fmt.Printf("  ✅ Agent '%s' deployed\n", agent.Name)
+		}
+		os.Remove(tmpPath)
 	}
 
 	fmt.Printf("\n  🎉 Done! %d agent(s) deployed in vCluster '%s'.\n\n", len(cfg.Agents), cfg.Cluster)
-	return nil
-}
-
-// applyManifest applies a YAML manifest string via kubectl.
-func applyManifest(ctx context.Context, kubeconfig, manifest string) error {
-	tmpFile, err := os.CreateTemp("", "claw-ctl-*.yaml")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmpFile.Name())
-
-	if _, err := tmpFile.WriteString(manifest); err != nil {
-		return err
-	}
-	tmpFile.Close()
-
-	args := []string{"apply", "-f", tmpFile.Name()}
-	if kubeconfig != "" {
-		args = append([]string{"--kubeconfig", kubeconfig}, args...)
-	}
-
-	cmd := exec.CommandContext(ctx, "kubectl", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s: %w", string(output), err)
-	}
 	return nil
 }
 
