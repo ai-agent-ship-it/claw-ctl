@@ -60,23 +60,49 @@ func (m *Manager) WaitReady(ctx context.Context, name, namespace string) error {
 }
 
 // Connect exports the vCluster kubeconfig to a file.
+// Extracts the kubeconfig from the vc-<name> Secret in the host namespace.
 func (m *Manager) Connect(ctx context.Context, name, namespace string) error {
 	fmt.Printf("  🔗 Exporting vCluster '%s' kubeconfig...\n", name)
 
 	kubeconfigPath := KubeconfigPath(name)
 
-	// Use --print to get kubeconfig YAML to stdout
-	cmd := exec.CommandContext(ctx, "vcluster", "connect", name,
-		"--namespace", namespace,
-		"--print",
+	// Extract kubeconfig from the vCluster secret (vc-<name>)
+	secretName := fmt.Sprintf("vc-%s", name)
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "secret", secretName,
+		"-n", namespace,
+		"-o", "jsonpath={.data.config}",
 	)
-	output, err := cmd.Output()
+	encoded, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("vcluster connect --print failed: %w", err)
+		// Fallback: try vcluster connect --print with 30s timeout
+		fmt.Println("  ℹ️  Secret method failed, trying vcluster connect...")
+		timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		fallbackCmd := exec.CommandContext(timeoutCtx, "vcluster", "connect", name,
+			"--namespace", namespace,
+			"--print",
+		)
+		output, err := fallbackCmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to export kubeconfig: %w", err)
+		}
+		if err := os.WriteFile(kubeconfigPath, output, 0600); err != nil {
+			return fmt.Errorf("failed to write kubeconfig: %w", err)
+		}
+		fmt.Printf("  ✅ Kubeconfig written to %s (via vcluster connect)\n", kubeconfigPath)
+		return nil
 	}
 
-	// Write kubeconfig to disk
-	if err := os.WriteFile(kubeconfigPath, output, 0600); err != nil {
+	// Decode base64
+	decodeCmd := exec.CommandContext(ctx, "base64", "--decode")
+	decodeCmd.Stdin = strings.NewReader(string(encoded))
+	decoded, err := decodeCmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to decode kubeconfig: %w", err)
+	}
+
+	if err := os.WriteFile(kubeconfigPath, decoded, 0600); err != nil {
 		return fmt.Errorf("failed to write kubeconfig to %s: %w", kubeconfigPath, err)
 	}
 
