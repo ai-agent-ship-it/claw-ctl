@@ -17,10 +17,11 @@ import (
 )
 
 var (
-	deployPreset  string
-	deployEnvFile string
-	deployAgents  string
-	deployModel   string
+	deployPreset   string
+	deployEnvFile  string
+	deployAgents   string
+	deployModel    string
+	deployChannels string
 )
 
 var deployCmd = &cobra.Command{
@@ -73,9 +74,7 @@ Can be used with:
 							Model:       model,
 							MaxTokens:   8192,
 							Temperature: 0.2,
-							Channels: config.ChannelsConfig{
-								HTTP: &config.ChannelHTTP{Enabled: true},
-							},
+							Channels:    parseChannelsFlag(deployChannels),
 						})
 					}
 				}
@@ -300,5 +299,27 @@ func init() {
 	deployCmd.Flags().StringVar(&deployEnvFile, "env-file", "", "Path to .env file for secrets")
 	deployCmd.Flags().StringVar(&deployAgents, "agents", "", "Comma-separated list of agent names")
 	deployCmd.Flags().StringVar(&deployModel, "model", "", "Default LLM model for agents")
+	deployCmd.Flags().StringVar(&deployChannels, "channels", "", "Comma-separated channels: telegram,discord,whatsapp")
 	rootCmd.AddCommand(deployCmd)
+}
+
+// parseChannelsFlag parses --channels flag into ChannelsConfig.
+func parseChannelsFlag(channels string) config.ChannelsConfig {
+	cfg := config.ChannelsConfig{
+		HTTP: &config.ChannelHTTP{Enabled: true}, // HTTP always enabled
+	}
+	if channels == "" {
+		return cfg
+	}
+	for _, ch := range strings.Split(channels, ",") {
+		switch strings.TrimSpace(strings.ToLower(ch)) {
+		case "telegram":
+			cfg.Telegram = &config.ChannelTelegram{Enabled: true}
+		case "discord":
+			cfg.Discord = &config.ChannelDiscord{Enabled: true}
+		case "whatsapp":
+			cfg.WhatsApp = &config.ChannelWhatsApp{Enabled: true}
+		}
+	}
+	return cfg
 }
