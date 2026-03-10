@@ -14,6 +14,23 @@ spec:
         app: {{ .AgentName }}
     spec:
       serviceAccountName: {{ .AgentName }}-sa
+      initContainers:
+        - name: config-resolver
+          image: alpine:3.23
+          command: ["sh", "-c"]
+          args:
+            - |
+              apk add --no-cache gettext > /dev/null 2>&1
+              envsubst < /config-template/config.json > /resolved-config/config.json
+              echo "Config resolved successfully"
+          envFrom:
+            - secretRef:
+                name: {{ .AgentName }}-secret
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+            - name: resolved-config
+              mountPath: /resolved-config
       containers:
         - name: picoclaw
           image: ghcr.io/ai-agent-ship-it/picoclaw:latest
@@ -23,7 +40,7 @@ spec:
             - secretRef:
                 name: {{ .AgentName }}-secret
           volumeMounts:
-            - name: config
+            - name: resolved-config
               mountPath: /home/picoclaw/.picoclaw/config.json
               subPath: config.json
             - name: workspace-data
@@ -51,9 +68,11 @@ spec:
               cpu: "500m"
               memory: "512Mi"
       volumes:
-        - name: config
+        - name: config-template
           configMap:
             name: {{ .AgentName }}-config
+        - name: resolved-config
+          emptyDir: {}
         - name: workspace-data
           persistentVolumeClaim:
             claimName: {{ .AgentName }}-workspace
