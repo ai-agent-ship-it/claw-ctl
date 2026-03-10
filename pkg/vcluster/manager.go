@@ -3,6 +3,7 @@ package vcluster
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -53,22 +54,28 @@ func (m *Manager) WaitReady(ctx context.Context, name, namespace string) error {
 	return fmt.Errorf("vcluster '%s' did not become ready within 3 minutes", name)
 }
 
-// Connect connects to a running vCluster.
+// Connect exports the vCluster kubeconfig to a file.
 func (m *Manager) Connect(ctx context.Context, name, namespace string) error {
-	fmt.Printf("  🔗 Connecting to vCluster '%s'...\n", name)
+	fmt.Printf("  🔗 Exporting vCluster '%s' kubeconfig...\n", name)
 
+	kubeconfigPath := KubeconfigPath(name)
+
+	// Use --print to get kubeconfig YAML to stdout
 	cmd := exec.CommandContext(ctx, "vcluster", "connect", name,
 		"--namespace", namespace,
-		"--update-current=false",
-		"--kube-config", fmt.Sprintf("/tmp/vcluster-%s-kubeconfig.yaml", name),
+		"--print",
 	)
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("vcluster connect failed: %w", err)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("vcluster connect --print failed: %w", err)
 	}
 
-	// Give it time to establish the connection
-	time.Sleep(3 * time.Second)
-	fmt.Println("  ✅ Connected to vCluster")
+	// Write kubeconfig to disk
+	if err := os.WriteFile(kubeconfigPath, output, 0600); err != nil {
+		return fmt.Errorf("failed to write kubeconfig to %s: %w", kubeconfigPath, err)
+	}
+
+	fmt.Printf("  ✅ Kubeconfig written to %s\n", kubeconfigPath)
 	return nil
 }
 

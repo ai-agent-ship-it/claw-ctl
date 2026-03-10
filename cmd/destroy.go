@@ -28,11 +28,11 @@ var destroyCmd = &cobra.Command{
 		if !forceDestroy {
 			fmt.Printf("\n  ⚠️  This will permanently destroy cluster '%s'\n", clusterName)
 			fmt.Printf("  Namespace: %s\n\n", namespace)
-			fmt.Print("  Type the cluster name to confirm: ")
+			fmt.Print("  Are you sure? [y/N]: ")
 			var confirm string
 			fmt.Scanln(&confirm)
-			if confirm != clusterName {
-				fmt.Println("  ❌ Confirmation failed. Aborting.")
+			if confirm != "y" && confirm != "Y" && confirm != "yes" {
+				fmt.Println("  ❌ Aborted.")
 				return nil
 			}
 		}
