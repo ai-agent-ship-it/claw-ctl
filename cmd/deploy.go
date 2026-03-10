@@ -161,7 +161,7 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 	// Phase 2: vCluster
 	fmt.Println("\n  ── Phase 2: vCluster ──")
 	vcm := vcluster.NewManager()
-	if err := vcm.Create(ctx, cfg.Cluster, namespace); err != nil {
+	if err := vcm.Create(ctx, cfg.Cluster, namespace, cfg.Secrets.Mode == "vault"); err != nil {
 		return err
 	}
 	if err := vcm.WaitReady(ctx, cfg.Cluster, namespace); err != nil {

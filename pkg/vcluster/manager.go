@@ -19,13 +19,24 @@ func NewManager() *Manager {
 }
 
 // Create creates a new vCluster in the given namespace (idempotent).
-func (m *Manager) Create(ctx context.Context, name, namespace string) error {
+// When useVault is true, enables fromHost secret syncing for VSO-created secrets.
+func (m *Manager) Create(ctx context.Context, name, namespace string, useVault bool) error {
 	fmt.Printf("  ☸️  Creating vCluster '%s' in namespace '%s'...\n", name, namespace)
 
-	cmd := exec.CommandContext(ctx, "vcluster", "create", name,
+	args := []string{"create", name,
 		"--namespace", namespace,
 		"--connect=false",
-	)
+	}
+
+	// Enable fromHost secret syncing when using Vault
+	if useVault {
+		args = append(args,
+			"--set", "sync.fromHost.secrets.enabled=true",
+		)
+		fmt.Println("  ℹ️  Enabling fromHost secret sync for Vault")
+	}
+
+	cmd := exec.CommandContext(ctx, "vcluster", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outStr := string(output)
