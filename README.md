@@ -66,6 +66,23 @@ claw-ctl deploy finance --preset financial-controller --env-file .env
 
 # With HashiCorp Vault
 claw-ctl deploy finance --preset financial-controller --vault
+
+# Override the model
+claw-ctl deploy finance --preset financial-controller --vault --model ollama/qwen2.5:7b
+
+# Specify Ollama server address
+claw-ctl deploy finance --preset financial-controller --vault \
+  --ollama-addr http://192.168.28.9:11434
+```
+
+### Deploy from Flags
+
+```bash
+# Deploy with specific channels
+claw-ctl deploy assistant --agents agent-asistente \
+  --model gemini/gemini-3.1-flash-lite-preview \
+  --channels telegram \
+  --vault
 ```
 
 ### Deploy from Config File
@@ -111,6 +128,7 @@ secrets:
 agents:
   - name: agent-financiero
     model: ollama/qwen2.5-coder:14b
+    ollamaAddr: http://192.168.28.9:11434    # Optional, Ollama server address
     maxTokens: 32000
     temperature: 0.1
     channels:
@@ -122,6 +140,18 @@ agents:
       skills:
         - workspace/agent-financiero/skills/financial-analyst/
 ```
+
+### Deploy Flags
+
+| Flag | Description |
+|---|---|
+| `--preset` | Use a built-in preset configuration |
+| `--agents` | Comma-separated list of agent names |
+| `--model` | LLM model (overrides preset default) |
+| `--channels` | Comma-separated channels: `telegram,discord,whatsapp` |
+| `--ollama-addr` | Ollama server address (also: `OLLAMA_ADDR` env or `.env`) |
+| `--env-file` | Path to `.env` file for secrets |
+| `--vault` | Enable Vault integration |
 
 ### Agent Workspace Files
 
@@ -199,6 +229,8 @@ Resolution priority: **flags → env vars → .env file**
 | Environment | `VAULT_ADDR`, `VAULT_TOKEN` |
 | .env file | `VAULT_ADDR=...`, `VAULT_TOKEN=...` |
 
+> **Force re-sync:** Every `deploy --vault` deletes the existing K8s Secret so VSO recreates it with the latest Vault data. No waiting for `refreshAfter`.
+
 #### 3. Manual Mode
 
 Skips automatic secret provisioning. You manage secrets yourself.
@@ -243,15 +275,22 @@ Each agent runs in an isolated [vCluster](https://www.vcluster.com/) with:
 - **Multi-agent support** — multiple agents per cluster, each with isolated secrets
 - **Vault integration** — VSO syncs secrets from host namespace into vCluster
 - **fromHost secret sync** — enabled automatically when using `--vault`
+- **Config hash auto-restart** — pods restart automatically when config changes
+- **envsubst init container** — resolves `${VAR}` tokens in config.json from secrets
 
 ### Deployment Flow
 
 ```
 Phase 1: Infrastructure → K8s connectivity + namespace creation
 Phase 2: vCluster      → Create + wait ready (+ fromHost secret sync if Vault)
-Phase 3: Secrets        → Vault API provisioning + VSO CRDs (or .env → K8s Secrets)
+Phase 3: Secrets        → Vault provisioning + VSO CRDs + force re-sync
 Phase 4: Manifests      → Apply via `vcluster connect -- kubectl apply`
+                          (configHash annotation triggers rollout on changes)
 ```
+
+### Ollama Address Resolution
+
+Priority: **`--ollama-addr` flag → `OLLAMA_ADDR` env var → `.env` file → default `http://ollama.default.svc:11434`**
 
 ---
 

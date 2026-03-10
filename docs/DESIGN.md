@@ -78,6 +78,17 @@ graph LR
 | `--vault` | — | Enable Vault integration (boolean) |
 | `--vault-addr` | `VAULT_ADDR` | Vault server address (override) |
 | `--vault-token` | `VAULT_TOKEN` | Vault authentication token (override) |
+| `--ollama-addr` | `OLLAMA_ADDR` | Ollama server address (e.g. `http://192.168.28.9:11434`) |
+
+### Deploy Flags
+
+| Flag | Description |
+|---|---|
+| `--preset` | Use a built-in preset configuration |
+| `--agents` | Comma-separated list of agent names |
+| `--model` | LLM model (overrides preset default) |
+| `--channels` | Comma-separated channels: `telegram,discord,whatsapp` |
+| `--env-file` | Path to `.env` file for secrets |
 
 ---
 
@@ -119,7 +130,7 @@ sequenceDiagram
     Note over CLI,VC: Phase 2: vCluster
     CLI->>VC: vcluster create finance (idempotent, reuses if exists)
     CLI->>VC: Wait for pod readiness (3min timeout)
-    Note over CLI: If --vault: pass values.yaml with<br/>sync.fromHost.secrets.all=true
+    Note over CLI: If --vault: pass values.yaml with<br/>sync.fromHost.secrets.mappings.byName
     end
 
     alt Vault Mode (--vault)
@@ -169,6 +180,17 @@ When `--vault` is used, `resolveVaultConfig` resolves address and token with thi
 3. .env file (if --env-file is specified)
 ```
 
+### Ollama Address Resolution
+
+`resolveOllamaAddr` resolves the Ollama server address with this priority:
+
+```
+1. CLI flag (--ollama-addr)
+2. Environment variable (OLLAMA_ADDR)
+3. .env file (if --env-file is specified)
+4. Template default (http://ollama.default.svc:11434/v1)
+```
+
 ### Vault API Operations (via net/http, no SDK)
 
 | Operation | Vault API | Idempotent |
@@ -192,6 +214,16 @@ When `--vault` is used, `resolveVaultConfig` resolves address and token with thi
 Vault KV → VSO → K8s Secret (host NS) → vCluster fromHost sync → Pod envFrom
 ```
 
+> **Force re-sync:** Every `deploy --vault` deletes the existing K8s Secret before VSO recreates it, ensuring the latest Vault data is always used.
+
+### Config Variable Resolution (envsubst)
+
+PicoClaw reads `config.json` literally — no `${VAR}` expansion. An **init container** (`config-resolver`) runs `envsubst` to replace `${TELEGRAM_BOT_TOKEN}`, `${GEMINI_API_KEY}`, etc. with actual values from the K8s Secret before PicoClaw starts.
+
+### Config Hash Auto-Restart
+
+A SHA256 hash of the rendered ConfigMap is added as `claw-ctl/config-hash` annotation on the pod template. When config changes (model, ollama-addr, channels), the hash changes and Kubernetes triggers an automatic rollout.
+
 ---
 
 ## What the CLI Generates (per agent)
@@ -203,9 +235,9 @@ All manifests are **embedded Go templates** rendered dynamically per agent confi
 | `namespace.yaml` | `agents` NS inside vCluster |
 | `rbac.yaml.tmpl` | SA + Crystal Wall Role (deny secrets read) |
 | `pvc.yaml.tmpl` | Workspace persistence |
-| `configmap.yaml.tmpl` | `config.json` + `mcp_config.json` |
+| `configmap.yaml.tmpl` | `config.json` (model, model_name, channels, api_base) + `mcp_config.json` |
 | `workspace-configmap.yaml.tmpl` | SOUL.md, IDENTITY.md, USER.md, AGENT.md, ENVIRONMENT.md |
-| `deployment.yaml.tmpl` | PicoClaw container with volume mounts |
+| `deployment.yaml.tmpl` | PicoClaw container + envsubst init container + configHash annotation |
 | `service.yaml.tmpl` | ClusterIP for gateway |
 | `ingress.yaml.tmpl` | Traefik ingress |
 | `vault-connection.yaml.tmpl` | VaultConnection CR (Vault mode only) |
@@ -267,9 +299,9 @@ Each agent has editable files mounted via ConfigMaps:
 claw-ctl/
 ├── main.go
 ├── cmd/
-│   ├── root.go              # Cobra root, global flags, resolveVaultConfig()
+│   ├── root.go              # Cobra root, global flags, resolveVaultConfig(), resolveOllamaAddr()
 │   ├── init.go              # Interactive wizard (Bubbletea TUI)
-│   ├── deploy.go            # 4-phase orchestrator
+│   ├── deploy.go            # 4-phase orchestrator + parseChannelsFlag()
 │   ├── destroy.go           # Teardown (y/N confirmation)
 │   ├── reload.go            # Hot-reload workspace ConfigMaps
 │   ├── status.go            # Health + pod status
@@ -279,7 +311,7 @@ claw-ctl/
 │   │   ├── prompt.go        # Bubbletea TUI engine
 │   │   └── secret_gate.go   # Mandatory token collection
 │   ├── config/
-│   │   ├── types.go         # ClusterConfig, AgentConfig, ChannelConfig
+│   │   ├── types.go         # ClusterConfig, AgentConfig (+ OllamaAddr), ChannelConfig
 │   │   └── presets.go       # Embedded preset definitions
 │   ├── vcluster/
 │   │   └── manager.go       # Create (+ values), WaitReady, ApplyManifest, Connect, Delete
@@ -290,7 +322,7 @@ claw-ctl/
 │   ├── k8s/
 │   │   └── client.go        # CreateNamespace, EnsureSecret (idempotent)
 │   └── manifests/
-│       ├── renderer.go      # Template engine + RenderVaultManifests
+│       ├── renderer.go      # Template engine + configHash + RenderVaultManifests
 │       └── embed/           # go:embed YAML templates
 │           ├── namespace.yaml
 │           ├── rbac.yaml.tmpl
