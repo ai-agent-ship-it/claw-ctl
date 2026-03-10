@@ -19,15 +19,13 @@ spec:
           image: ghcr.io/ai-agent-ship-it/picoclaw:latest
           ports:
             - containerPort: 18790
-          env:
-            - name: PICOCLAW_CONFIG
-              value: /etc/picoclaw/config.json
           envFrom:
             - secretRef:
                 name: {{ .AgentName }}-secret
           volumeMounts:
             - name: config
-              mountPath: /etc/picoclaw
+              mountPath: /home/picoclaw/.picoclaw/config.json
+              subPath: config.json
             - name: workspace-data
               mountPath: /home/picoclaw/.picoclaw/workspace
             - name: workspace-files
