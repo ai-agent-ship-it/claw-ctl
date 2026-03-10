@@ -18,13 +18,21 @@ spec:
       serviceAccountName: {{ .AgentName }}-sa
       initContainers:
         - name: config-resolver
-          image: alpine:3.23
+          image: ghcr.io/ai-agent-ship-it/picoclaw:latest
           command: ["sh", "-c"]
           args:
             - |
-              apk add --no-cache gettext > /dev/null 2>&1
-              envsubst < /config-template/config.json > /resolved-config/config.json
-              envsubst < /config-template/mcp_config.json > /resolved-config/mcp_config.json
+              cp /config-template/config.json /tmp/config.json.tpl
+              cp /config-template/mcp_config.json /tmp/mcp_config.json.tpl
+              while IFS='=' read -r key val; do
+                [ -z "$key" ] && continue
+                sed -i "s|\${${key}}|${val}|g" /tmp/config.json.tpl
+                sed -i "s|\${${key}}|${val}|g" /tmp/mcp_config.json.tpl
+              done <<EOF
+              $(env | grep -E '^[A-Z_]+=' | grep -v '^_=')
+              EOF
+              cp /tmp/config.json.tpl /resolved-config/config.json
+              cp /tmp/mcp_config.json.tpl /resolved-config/mcp_config.json
               echo "Config resolved successfully"
           envFrom:
             - secretRef:
