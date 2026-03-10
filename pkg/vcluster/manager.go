@@ -28,7 +28,7 @@ func (m *Manager) Create(ctx context.Context, name, namespace string, agentNames
 		"--connect=false",
 	}
 
-	// Generate values file with fromHost secret sync mappings
+	// Generate values file with fromHost secret sync
 	if len(agentNames) > 0 {
 		valuesFile, err := os.CreateTemp("", "claw-ctl-values-*.yaml")
 		if err != nil {
@@ -36,14 +36,7 @@ func (m *Manager) Create(ctx context.Context, name, namespace string, agentNames
 		}
 		defer os.Remove(valuesFile.Name())
 
-		// Build mappings for each agent's secret
-		valuesFile.WriteString("sync:\n  fromHost:\n    secrets:\n      enabled: true\n      mappings:\n")
-		for _, agentName := range agentNames {
-			secretName := agentName + "-secret"
-			valuesFile.WriteString(fmt.Sprintf("        - fromHostNamespace: \"%s\"\n", namespace))
-			valuesFile.WriteString(fmt.Sprintf("          fromVirtualNamespace: \"agents\"\n"))
-			valuesFile.WriteString(fmt.Sprintf("          selector:\n            matchLabels:\n              app.kubernetes.io/name: \"%s\"\n", secretName))
-		}
+		valuesFile.WriteString("sync:\n  fromHost:\n    secrets:\n      enabled: true\n      all: true\n")
 		valuesFile.Close()
 
 		args = append(args, "-f", valuesFile.Name())
