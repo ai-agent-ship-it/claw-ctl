@@ -36,6 +36,7 @@ func RenderManifest(templateName string, agent config.AgentConfig) (string, erro
 		"Model":       agent.Model,
 		"MaxTokens":   agent.MaxTokens,
 		"Temperature": agent.Temperature,
+		"OllamaAddr":  agent.OllamaAddr,
 		"Channels":    agent.Channels,
 	}
 

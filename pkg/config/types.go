@@ -22,6 +22,7 @@ type AgentConfig struct {
 	Model        string          `yaml:"model" json:"model"`
 	MaxTokens    int             `yaml:"maxTokens" json:"maxTokens"`
 	Temperature  float64         `yaml:"temperature" json:"temperature"`
+	OllamaAddr   string          `yaml:"ollamaAddr,omitempty" json:"ollamaAddr,omitempty"`
 	Capabilities []string        `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
 	Channels     ChannelsConfig  `yaml:"channels" json:"channels"`
 	Workspace    WorkspaceConfig `yaml:"workspace,omitempty" json:"workspace,omitempty"`

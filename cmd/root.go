@@ -13,6 +13,7 @@ var (
 	vaultAddr  string
 	vaultToken string
 	presetName string
+	ollamaAddr string
 )
 
 var rootCmd = &cobra.Command{
@@ -39,6 +40,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&useVault, "vault", false, "Use Vault for secrets (reads VAULT_ADDR, VAULT_TOKEN from env or .env)")
 	rootCmd.PersistentFlags().StringVar(&vaultAddr, "vault-addr", "", "Vault server address (overrides VAULT_ADDR)")
 	rootCmd.PersistentFlags().StringVar(&vaultToken, "vault-token", "", "Vault token (overrides VAULT_TOKEN)")
+	rootCmd.PersistentFlags().StringVar(&ollamaAddr, "ollama-addr", "", "Ollama server address (overrides OLLAMA_ADDR, e.g. http://192.168.1.100:11434)")
 }
 
 // resolveVaultConfig resolves Vault address and token from flags, env vars, or .env file.
@@ -74,6 +76,24 @@ func resolveVaultConfig(envFile string) (string, string, error) {
 	}
 
 	return addr, token, nil
+}
+
+// resolveOllamaAddr resolves the Ollama server address from flags, env vars, or .env file.
+func resolveOllamaAddr(envFile string) string {
+	addr := ollamaAddr
+
+	// Fallback to env var
+	if addr == "" {
+		addr = os.Getenv("OLLAMA_ADDR")
+	}
+
+	// Fallback to .env file
+	if addr == "" && envFile != "" {
+		envVars, _ := readEnvSimple(envFile)
+		addr = envVars["OLLAMA_ADDR"]
+	}
+
+	return addr
 }
 
 // readEnvSimple reads key=value pairs from a file (minimal .env parser).

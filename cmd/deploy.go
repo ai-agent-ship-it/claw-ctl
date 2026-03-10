@@ -127,6 +127,16 @@ Can be used with:
 			}
 		}
 
+		// Resolve Ollama address (--ollama-addr > OLLAMA_ADDR > .env)
+		resolvedOllama := resolveOllamaAddr(deployEnvFile)
+		if resolvedOllama != "" {
+			for i := range cfg.Agents {
+				if cfg.Agents[i].OllamaAddr == "" {
+					cfg.Agents[i].OllamaAddr = resolvedOllama
+				}
+			}
+		}
+
 		return runDeploy(cfg, secretValues)
 	},
 }
