@@ -51,27 +51,27 @@ spec:
                 name: {{ .AgentName }}-secret
           volumeMounts:
             - name: resolved-config
-              mountPath: /home/picoclaw/.picoclaw/config.json
+              mountPath: /root/.picoclaw/config.json
               subPath: config.json
             - name: resolved-config
-              mountPath: /home/picoclaw/.picoclaw/mcp_config.json
+              mountPath: /root/.picoclaw/mcp_config.json
               subPath: mcp_config.json
             - name: workspace-data
-              mountPath: /home/picoclaw/.picoclaw/workspace
+              mountPath: /root/.picoclaw/workspace
             - name: workspace-files
-              mountPath: /home/picoclaw/.picoclaw/workspace/SOUL.md
+              mountPath: /root/.picoclaw/workspace/SOUL.md
               subPath: SOUL.md
             - name: workspace-files
-              mountPath: /home/picoclaw/.picoclaw/workspace/IDENTITY.md
+              mountPath: /root/.picoclaw/workspace/IDENTITY.md
               subPath: IDENTITY.md
             - name: workspace-files
-              mountPath: /home/picoclaw/.picoclaw/workspace/USER.md
+              mountPath: /root/.picoclaw/workspace/USER.md
               subPath: USER.md
             - name: workspace-files
-              mountPath: /home/picoclaw/.picoclaw/workspace/AGENT.md
+              mountPath: /root/.picoclaw/workspace/AGENT.md
               subPath: AGENT.md
             - name: workspace-files
-              mountPath: /home/picoclaw/.picoclaw/workspace/ENVIRONMENT.md
+              mountPath: /root/.picoclaw/workspace/ENVIRONMENT.md
               subPath: ENVIRONMENT.md
           resources:
             requests:
