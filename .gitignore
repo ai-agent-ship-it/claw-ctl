@@ -1,0 +1,23 @@
+# Binaries
+claw-ctl
+picoclaw-ctl
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+*.env
+
+# GoReleaser
+dist/

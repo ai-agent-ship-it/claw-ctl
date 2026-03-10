@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .AgentName }}-config
+  namespace: agents
+data:
+  config.json: |
+    {
+      "gateway": {
+        "allowPublicBind": true,
+        "listen": "0.0.0.0:18790"
+      },
+      "agents": {
+        "defaults": {
+          "restrict_to_workspace": false,
+          "model": "{{ .Model }}",
+          "maxTokens": {{ .MaxTokens }},
+          "temperature": {{ .Temperature }}
+        }
+      },
+      "tools": {
+        "exec": {
+          "enable_deny_patterns": true,
+          "custom_deny_patterns": [
+            "(?i)-n\\s+agents",
+            "(?i)--namespace\\s*=?\\s*agents",
+            "(?i)secrets?",
+            "(?i)api_key",
+            "(?i)token"
+          ]
+        }
+      },
+      "channels": {
+        {{- if .Channels.Telegram }}
+        "telegram": {
+          "enabled": {{ .Channels.Telegram.Enabled }},
+          "token": "${TELEGRAM_BOT_TOKEN}"
+          {{- if .Channels.Telegram.AllowFrom }},
+          "allowFrom": [{{ range $i, $v := .Channels.Telegram.AllowFrom }}{{ if $i }},{{ end }}"{{ $v }}"{{ end }}]
+          {{- end }}
+        }{{ if or .Channels.Discord .Channels.WhatsApp }},{{ end }}
+        {{- end }}
+        {{- if .Channels.Discord }}
+        "discord": {
+          "enabled": {{ .Channels.Discord.Enabled }},
+          "token": "${DISCORD_BOT_TOKEN}"
+        }{{ if .Channels.WhatsApp }},{{ end }}
+        {{- end }}
+        {{- if .Channels.WhatsApp }}
+        "whatsapp": {
+          "enabled": {{ .Channels.WhatsApp.Enabled }},
+          "token": "${WHATSAPP_API_TOKEN}"
+        }
+        {{- end }}
+      },
+      "model_list": [
+        {{- if hasPrefix .Model "gemini/" }}
+        {
+          "model_name": "{{ .Model }}",
+          "model": "{{ .Model }}",
+          "api_base": "https://generativelanguage.googleapis.com/v1beta",
+          "api_key": "${GEMINI_API_KEY}"
+        }
+        {{- else if hasPrefix .Model "ollama/" }}
+        {
+          "model_name": "{{ .Model }}",
+          "model": "{{ .Model }}",
+          "api_base": "http://ollama.default.svc:11434",
+          "api_key": "not-needed"
+        }
+        {{- else }}
+        {
+          "model_name": "{{ .Model }}",
+          "model": "{{ .Model }}"
+        }
+        {{- end }}
+      ]
+    }
+  mcp_config.json: |
+    {
+      "mcpServers": {
+        "github": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": {
+            "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_ACCESS_TOKEN}"
+          }
+        }
+      }
+    }

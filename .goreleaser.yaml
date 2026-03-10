@@ -1,0 +1,48 @@
+version: 2
+
+project_name: claw-ctl
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: claw-ctl
+    main: .
+    binary: claw-ctl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: claw-ctl
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+
+release:
+  github:
+    owner: ai-agent-ship-it
+    name: claw-ctl
+  prerelease: auto
+  name_template: "{{.ProjectName}} v{{.Version}}"

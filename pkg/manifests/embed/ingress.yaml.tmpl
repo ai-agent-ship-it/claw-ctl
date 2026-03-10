@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .AgentName }}-ingress
+  namespace: agents
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-reynoso-pro
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - {{ .AgentName }}.reynoso.pro
+      secretName: {{ .AgentName }}-tls
+  rules:
+    - host: {{ .AgentName }}.reynoso.pro
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .AgentName }}-svc
+                port:
+                  number: 18790

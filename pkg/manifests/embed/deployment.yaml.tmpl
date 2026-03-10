@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .AgentName }}-gateway
+  namespace: agents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .AgentName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .AgentName }}
+    spec:
+      serviceAccountName: {{ .AgentName }}-sa
+      containers:
+        - name: picoclaw
+          image: ghcr.io/ai-agent-ship-it/picoclaw:latest
+          ports:
+            - containerPort: 18790
+          env:
+            - name: PICOCLAW_CONFIG
+              value: /etc/picoclaw/config.json
+          envFrom:
+            - secretRef:
+                name: {{ .AgentName }}-secret
+          volumeMounts:
+            - name: config
+              mountPath: /etc/picoclaw
+            - name: workspace-data
+              mountPath: /home/picoclaw/.picoclaw/workspace
+            - name: workspace-files
+              mountPath: /home/picoclaw/.picoclaw/workspace/SOUL.md
+              subPath: SOUL.md
+            - name: workspace-files
+              mountPath: /home/picoclaw/.picoclaw/workspace/IDENTITY.md
+              subPath: IDENTITY.md
+            - name: workspace-files
+              mountPath: /home/picoclaw/.picoclaw/workspace/USER.md
+              subPath: USER.md
+            - name: workspace-files
+              mountPath: /home/picoclaw/.picoclaw/workspace/AGENT.md
+              subPath: AGENT.md
+            - name: workspace-files
+              mountPath: /home/picoclaw/.picoclaw/workspace/ENVIRONMENT.md
+              subPath: ENVIRONMENT.md
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .AgentName }}-config
+        - name: workspace-data
+          persistentVolumeClaim:
+            claimName: {{ .AgentName }}-workspace
+        - name: workspace-files
+          configMap:
+            name: {{ .AgentName }}-workspace
