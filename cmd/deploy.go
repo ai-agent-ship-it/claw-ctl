@@ -161,7 +161,14 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 	// Phase 2: vCluster
 	fmt.Println("\n  ── Phase 2: vCluster ──")
 	vcm := vcluster.NewManager()
-	if err := vcm.Create(ctx, cfg.Cluster, namespace, cfg.Secrets.Mode == "vault"); err != nil {
+	// Build agent names for secret sync mapping (only needed for Vault mode)
+	var syncAgentNames []string
+	if cfg.Secrets.Mode == "vault" {
+		for _, a := range cfg.Agents {
+			syncAgentNames = append(syncAgentNames, a.Name)
+		}
+	}
+	if err := vcm.Create(ctx, cfg.Cluster, namespace, syncAgentNames); err != nil {
 		return err
 	}
 	if err := vcm.WaitReady(ctx, cfg.Cluster, namespace); err != nil {

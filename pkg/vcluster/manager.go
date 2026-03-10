@@ -19,8 +19,8 @@ func NewManager() *Manager {
 }
 
 // Create creates a new vCluster in the given namespace (idempotent).
-// When useVault is true, enables fromHost secret syncing for VSO-created secrets.
-func (m *Manager) Create(ctx context.Context, name, namespace string, useVault bool) error {
+// When agentNames is non-empty, enables fromHost secret syncing for those agents.
+func (m *Manager) Create(ctx context.Context, name, namespace string, agentNames []string) error {
 	fmt.Printf("  ☸️  Creating vCluster '%s' in namespace '%s'...\n", name, namespace)
 
 	args := []string{"create", name,
@@ -28,11 +28,25 @@ func (m *Manager) Create(ctx context.Context, name, namespace string, useVault b
 		"--connect=false",
 	}
 
-	// Enable fromHost secret syncing when using Vault
-	if useVault {
-		args = append(args,
-			"--set", "sync.fromHost.secrets.enabled=true",
-		)
+	// Generate values file with fromHost secret sync mappings
+	if len(agentNames) > 0 {
+		valuesFile, err := os.CreateTemp("", "claw-ctl-values-*.yaml")
+		if err != nil {
+			return fmt.Errorf("failed to create values file: %w", err)
+		}
+		defer os.Remove(valuesFile.Name())
+
+		// Build mappings for each agent's secret
+		valuesFile.WriteString("sync:\n  fromHost:\n    secrets:\n      enabled: true\n      mappings:\n")
+		for _, agentName := range agentNames {
+			secretName := agentName + "-secret"
+			valuesFile.WriteString(fmt.Sprintf("        - fromHostNamespace: \"%s\"\n", namespace))
+			valuesFile.WriteString(fmt.Sprintf("          fromVirtualNamespace: \"agents\"\n"))
+			valuesFile.WriteString(fmt.Sprintf("          selector:\n            matchLabels:\n              app.kubernetes.io/name: \"%s\"\n", secretName))
+		}
+		valuesFile.Close()
+
+		args = append(args, "-f", valuesFile.Name())
 		fmt.Println("  ℹ️  Enabling fromHost secret sync for Vault")
 	}
 
