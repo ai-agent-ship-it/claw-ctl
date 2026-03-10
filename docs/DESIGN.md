@@ -8,11 +8,11 @@
 | Requirement | Required? | Examples |
 |---|---|---|
 | **LLM Access** | ✅ Mandatory | `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `http://192.168.1.100:11434` (Ollama) |
-| Kubeconfig | Optional | Uses `~/.kube/config` if present; can also deploy in Docker-only mode ⁽¹⁾ |
-| Vault token | Optional | Only if `--vault-addr` is used |
+| Kubeconfig | ✅ Yes | Uses `~/.kube/config` |
+| `vcluster` CLI | ✅ Yes | v0.30+ |
+| `kubectl` | ✅ Yes | For manifest operations |
+| Vault + VSO | Optional | Only if `--vault` flag is used |
 | Channel tokens | Optional | Only if Telegram/WhatsApp/Discord channels are enabled |
-
-⁽¹⁾ *Future: Docker-only mode for users without K8s cluster*
 
 ---
 
@@ -42,7 +42,8 @@ graph LR
   ADMIN -->|"pre-configures"| VAULT
   ADMIN -->|"pre-configures"| K8S
   CLI -->|"creates/manages"| VCLUSTER
-  CLI -->|"provisions"| VAULT
+  CLI -->|"provisions KV, policies, roles"| VAULT
+  CLI -->|"applies CRDs"| VSO
   CLI -->|"deploys manifests"| K8S
   VCLUSTER -->|"hosts"| PICOCLAW["🤖 PicoClaw Agent"]
   PICOCLAW -->|"uses"| OLLAMA
@@ -50,118 +51,33 @@ graph LR
   PICOCLAW -->|"sends/receives"| TELEGRAM
   PICOCLAW -->|"sends/receives"| DISCORD
   PICOCLAW -->|"sends/receives"| WHATSAPP
-  VSO -->|"syncs secrets into"| VCLUSTER
+  VSO -->|"syncs secrets from Vault into"| K8S
+  VCLUSTER -->|"fromHost sync"| PICOCLAW
 ```
-
----
-
-## Use Cases
-
-```mermaid
-graph TB
-  DEV["👨‍💻 Developer"]
-
-  subgraph "claw-ctl Use Cases"
-    UC1["UC-1: Deploy agent with<br/>interactive wizard"]
-    UC2["UC-2: Deploy agent<br/>from preset"]
-    UC3["UC-3: Deploy agent<br/>from config file"]
-    UC4["UC-4: Add agent to<br/>existing cluster"]
-    UC5["UC-5: Check cluster<br/>and agent status"]
-    UC6["UC-6: Destroy cluster<br/>and cleanup"]
-    UC7["UC-7: List available<br/>presets"]
-  end
-
-  DEV --> UC1
-  DEV --> UC2
-  DEV --> UC3
-  DEV --> UC4
-  DEV --> UC5
-  DEV --> UC6
-  DEV --> UC7
-```
-
-### UC-1: Deploy Agent with Interactive Wizard
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | Has an LLM token or Ollama address |
-| **Trigger** | `claw-ctl init` |
-| **Flow** | 1. Select preset or custom → 2. Name cluster → 3. Configure agents (model, channels) → 4. Secret Gate collects required tokens → 5. Review → 6. Deploy |
-| **Postcondition** | vCluster running, agent pods healthy, secrets injected |
-
-### UC-2: Deploy Agent from Preset
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | Has LLM token + knows desired preset |
-| **Trigger** | `claw-ctl deploy finance --preset financial-controller` |
-| **Flow** | 1. Load preset defaults → 2. Secret Gate prompts for required tokens → 3. Deploy |
-| **Postcondition** | Agent running with preset config |
-
-### UC-3: Deploy Agent from Config File
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | Has a `picoclaw.yaml` (created via wizard or manually) |
-| **Trigger** | `claw-ctl deploy --config picoclaw.yaml` |
-| **Flow** | 1. Parse config → 2. Validate completeness → 3. Secret Gate if tokens missing → 4. Deploy |
-| **Postcondition** | Agent(s) running per config |
-
-### UC-4: Add Agent to Existing Cluster
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | vCluster already running |
-| **Trigger** | `claw-ctl add-agent finance agent-reportes` |
-| **Flow** | 1. Detect existing cluster → 2. Wizard for new agent config → 3. Secret Gate → 4. Generate + apply new agent manifests → 5. Patch vCluster secret sync |
-| **Postcondition** | New agent pod running alongside existing ones |
-
-### UC-5: Check Status
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | vCluster exists |
-| **Trigger** | `claw-ctl status finance` |
-| **Output** | Cluster health, per-agent pod status, secret sync state, model info, channel connections |
-
-### UC-6: Destroy Cluster
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | vCluster exists |
-| **Trigger** | `claw-ctl destroy finance` |
-| **Flow** | 1. Confirmation prompt → 2. Delete vCluster + NS → 3. Clean Vault (if used) → 4. Remove local config |
-| **Postcondition** | All resources removed |
-
-### UC-7: List Presets
-
-| Field | Value |
-|---|---|
-| **Actor** | Developer |
-| **Precondition** | None |
-| **Trigger** | `claw-ctl presets` |
-| **Output** | Table of presets with agents, models, channels |
 
 ---
 
 ## CLI Commands
 
-| Command | Description |
-|---|---|
-| `claw-ctl init` | Interactive wizard (preset or custom) |
-| `claw-ctl deploy <name> --preset <p>` | Deploy from preset |
-| `claw-ctl deploy --config picoclaw.yaml` | Deploy from saved config |
-| `claw-ctl destroy <name>` | Full teardown (vCluster + Vault) |
-| `claw-ctl add-agent <cluster> <agent>` | Hot-add agent to running vCluster |
-| `claw-ctl reload <cluster> [agent]` | Push workspace file changes (SOUL, skills, etc.) without restart |
-| `claw-ctl status <name>` | Agent health, pod status, secret sync |
-| `claw-ctl presets` | List available presets |
+| Command | Description | Idempotent |
+|---|---|---|
+| `claw-ctl init` | Interactive wizard (preset or custom) | N/A |
+| `claw-ctl deploy <name> --preset <p>` | Deploy from preset | ✅ |
+| `claw-ctl deploy --config picoclaw.yaml` | Deploy from saved config | ✅ |
+| `claw-ctl deploy <name> --vault` | Deploy with Vault integration | ✅ |
+| `claw-ctl destroy <name>` | Full teardown (vCluster + NS) | ✅ |
+| `claw-ctl reload <cluster> [agent]` | Hot-reload workspace files via ConfigMaps | ✅ |
+| `claw-ctl status <name>` | Agent health, pod status | N/A |
+| `claw-ctl presets` | List available presets | N/A |
+
+### Global Flags
+
+| Flag | Env Var | Description |
+|---|---|---|
+| `--config` | — | Config file (default: picoclaw.yaml) |
+| `--vault` | — | Enable Vault integration (boolean) |
+| `--vault-addr` | `VAULT_ADDR` | Vault server address (override) |
+| `--vault-token` | `VAULT_TOKEN` | Vault authentication token (override) |
 
 ---
 
@@ -176,181 +92,9 @@ graph TB
 | `minimal` | agent | llama3.1:8b | HTTP only | API-only agent |
 | `custom` | — | — | — | Full manual wizard |
 
-Presets are embedded YAML in the binary via `go:embed`. Users can also save custom presets with `claw-ctl init` → `[S]ave`.
+Presets are embedded YAML in the binary via `go:embed`.
 
 ---
-
-## Wizard Flow with Mandatory Secret Gate
-
-```mermaid
-flowchart TD
-  START["claw-ctl init"] --> PRESET["🎭 Choose preset or Custom"]
-
-  PRESET -->|"Preset"| LOAD["Load preset defaults"]
-  PRESET -->|"Custom"| CUSTOM["Full wizard:<br/>agents, models, channels, tokens, temp"]
-
-  LOAD --> NAME["🏗️ Cluster name?"]
-  CUSTOM --> NAME
-
-  NAME --> SECRET_STORE["🔐 Secret storage?<br/>• .env file<br/>• Vault<br/>• Manual"]
-
-  SECRET_STORE --> GATE["🚧 Mandatory Secret Gate"]
-
-  GATE --> SCAN["Scan config → required tokens"]
-
-  subgraph "🔑 Token Collection (blocks until complete)"
-    SCAN --> ASK["Prompt ONLY required tokens"]
-    ASK --> CHECK{"All filled?"}
-    CHECK -->|"❌ No"| ASK
-    CHECK -->|"✅ Yes"| PASS
-  end
-
-  PASS --> REVIEW["📋 Review"]
-  REVIEW -->|"Deploy"| DEPLOY["🚀"]
-  REVIEW -->|"Save"| SAVE["💾 picoclaw.yaml"]
-  REVIEW -->|"Edit"| PRESET
-```
-
-### Secret Requirement Matrix
-
-| Condition | Required Token |
-|---|---|
-| Telegram enabled | `TELEGRAM_BOT_TOKEN` |
-| WhatsApp enabled | `WHATSAPP_API_TOKEN` |
-| Discord enabled | `DISCORD_BOT_TOKEN` |
-| Cloud model (`gemini/*`) | `GEMINI_API_KEY` |
-| GitHub MCP enabled | `GITHUB_ACCESS_TOKEN` |
-| Ollama model | *none* |
-
-> [!IMPORTANT]
-> Deploy **will not start** until every required token is provided. The gate loops until complete.
-
----
-
-## Config File (`picoclaw.yaml`)
-
-```yaml
-cluster: finance
-preset: financial-controller
-secrets:
-  mode: env
-  envFile: .env
-agents:
-  - name: agent-financiero
-    model: ollama/qwen2.5-coder:14b
-    maxTokens: 32000
-    temperature: 0.1
-    capabilities: [traefik, cnpg, redis]
-    channels:
-      telegram: { enabled: true, allowFrom: ["1498879396"] }
-      http: { enabled: true }
-    # Agent workspace value files (editable, reloadable)
-    workspace:
-      soul: workspace/agent-financiero/SOUL.md
-      identity: workspace/agent-financiero/IDENTITY.md
-      user: workspace/agent-financiero/USER.md
-      agent: workspace/agent-financiero/AGENT.md
-      environment: workspace/agent-financiero/ENVIRONMENT.md
-      memory: workspace/agent-financiero/memory/
-      skills:
-        - workspace/agent-financiero/skills/financial-analyst/
-        - workspace/agent-financiero/skills/github/
-```
-
----
-
-## Agent Workspace Files
-
-Each agent has its own set of **editable value files** that define its personality, knowledge, and capabilities. These files live on disk, are version-controlled, and get mounted into the agent container via ConfigMaps.
-
-### Workspace Directory Layout
-
-```
-workspace/
-└── agent-financiero/
-    ├── SOUL.md              # Personality, values, behavior rules
-    ├── IDENTITY.md          # Name, version, purpose, capabilities
-    ├── USER.md              # Info about the user (preferences, timezone)
-    ├── AGENT.md             # Operational instructions, do's and don'ts
-    ├── ENVIRONMENT.md       # K8s context, installed controllers, security rules
-    ├── memory/
-    │   ├── MEMORY.md        # Persistent facts the agent remembers
-    │   └── *.md             # Additional memory files
-    └── skills/
-        ├── financial-analyst/
-        │   └── SKILL.md     # Custom skill: expense tracking, reports
-        ├── github/
-        │   └── SKILL.md     # GitHub PR reviews, issues
-        └── ...
-```
-
-### How Workspace Files Are Mounted
-
-```mermaid
-graph LR
-  subgraph "User Disk"
-    FILES["workspace/<br/>agent-financiero/<br/>SOUL.md, IDENTITY.md,<br/>skills/, memory/"]
-  end
-
-  subgraph "claw-ctl"
-    RENDER["Render ConfigMaps<br/>from workspace files"]
-  end
-
-  subgraph "vCluster (agents NS)"
-    CM_SOUL["ConfigMap:<br/>agent-financiero-workspace"]
-    PVC["PVC:<br/>agent-financiero-memory"]
-    POD["PicoClaw Pod"]
-    MOUNT_WS["/home/picoclaw/.picoclaw/workspace/"]
-  end
-
-  FILES -->|"read"| RENDER
-  RENDER -->|"kubectl apply"| CM_SOUL
-  RENDER -->|"persistent volume"| PVC
-  CM_SOUL -->|"volumeMount"| MOUNT_WS
-  PVC -->|"volumeMount"| MOUNT_WS
-  MOUNT_WS -->|"loaded by"| POD
-```
-
-### File Behavior
-
-| File | Storage | Editable | Reloadable | Purpose |
-|---|---|---|---|---|
-| `SOUL.md` | ConfigMap | ✅ Edit on disk, redeploy | ✅ `claw-ctl reload` | Personality, values |
-| `IDENTITY.md` | ConfigMap | ✅ | ✅ | Name, purpose, version |
-| `USER.md` | ConfigMap | ✅ | ✅ | User preferences |
-| `AGENT.md` | ConfigMap | ✅ | ✅ | Operational rules |
-| `ENVIRONMENT.md` | ConfigMap (generated) | ⚠️ Auto-generated by CLI | ✅ | K8s context, installed CRDs |
-| `memory/` | PVC (persistent) | ✅ Agent writes here | Persists across restarts | Agent's learned facts |
-| `skills/` | ConfigMap | ✅ | ✅ `claw-ctl reload` | Custom capabilities |
-
-> [!TIP]
-> `ENVIRONMENT.md` is **auto-generated** by the CLI based on what the cluster has installed (Traefik, CNPG, Redis, etc.). The others are fully user-controlled.
-
-### Reload Without Redeploying
-
-```bash
-# Edit the soul file
-vim workspace/agent-financiero/SOUL.md
-
-# Push changes to the running agent (no restart needed)
-claw-ctl reload finance agent-financiero
-
-# Or reload all agents in a cluster
-claw-ctl reload finance --all
-```
-
-The `reload` command updates the ConfigMaps in-place. PicoClaw watches for file changes and reloads its context automatically.
-
-### Default Workspace (Generated by Wizard)
-
-When using a preset or the wizard, `claw-ctl init` generates a default workspace with sensible files:
-
-```bash
-$ claw-ctl init
-  ...
-  ✅ Workspace generated at ./workspace/agent-financiero/
-  📝 Edit SOUL.md and IDENTITY.md to customize your agent's personality.
-```
 
 ## Deployment Lifecycle
 
@@ -359,54 +103,93 @@ sequenceDiagram
     participant User
     participant CLI as claw-ctl
     participant K8s as Host K8s
-    participant Helm as Helm SDK
+    participant VC as vCluster
     participant Vault as Vault (optional)
+    participant VSO as VSO (optional)
 
-    User->>CLI: claw-ctl deploy finance --preset financial-controller
+    User->>CLI: claw-ctl deploy finance --preset financial-controller --vault
 
     rect rgb(40, 40, 60)
-    Note over CLI: Phase 1: Preflight
-    CLI->>CLI: Validate kubeconfig connectivity
-    CLI->>CLI: Secret Gate (collect tokens)
-    CLI->>CLI: Generate all manifests from templates
+    Note over CLI,K8s: Phase 1: Infrastructure
+    CLI->>K8s: Verify kubeconfig connectivity
+    CLI->>K8s: Create namespace vcluster-finance (idempotent)
     end
 
     rect rgb(40, 60, 40)
-    Note over CLI,K8s: Phase 2: vCluster
-    CLI->>K8s: Create NS vcluster-finance
-    CLI->>Helm: Install vcluster chart (--connect=false)
-    CLI->>CLI: Wait for vCluster readiness
+    Note over CLI,VC: Phase 2: vCluster
+    CLI->>VC: vcluster create finance (idempotent, reuses if exists)
+    CLI->>VC: Wait for pod readiness (3min timeout)
+    Note over CLI: If --vault: pass values.yaml with<br/>sync.fromHost.secrets.all=true
     end
 
-    alt Vault Mode
+    alt Vault Mode (--vault)
         rect rgb(60, 50, 40)
-        Note over CLI,Vault: Phase 3a: Vault
+        Note over CLI,Vault: Phase 3a: Vault Provisioning
         loop For each agent
-            CLI->>Vault: Create KV path + Policy + Auth Role
-            CLI->>K8s: Create SA + TokenSecret
-            CLI->>K8s: Apply VaultConnection/Auth/StaticSecret CRDs
+            CLI->>Vault: Check if KV path exists (GET)
+            CLI->>Vault: Create KV path with placeholders (if new)
+            CLI->>Vault: Create ACL policy (read-only)
+            CLI->>Vault: Create K8s auth role (bound to default SA)
+            CLI->>K8s: Apply VaultConnection CR
+            CLI->>K8s: Apply VaultAuth CR
+            CLI->>K8s: Apply VaultStaticSecret CR
         end
+        Note over VSO: VSO reads CRDs → creates K8s Secret
+        Note over VC: vCluster syncs secret from host → virtual
         end
     else .env Mode
         rect rgb(50, 60, 40)
         Note over CLI,K8s: Phase 3b: Native Secrets
         loop For each agent
-            CLI->>K8s: Create native K8s Secret from collected tokens
+            CLI->>K8s: EnsureSecret (create-or-update)
         end
         end
     end
 
     rect rgb(50, 40, 60)
-    Note over CLI,K8s: Phase 4: Agent Deploy
-    CLI->>K8s: vcluster connect (background)
-    CLI->>K8s: Apply Namespace, RBAC, PVC, ConfigMap
+    Note over CLI,VC: Phase 4: Agent Manifests
     loop For each agent
-        CLI->>K8s: Apply Deployment, Service, Ingress
+        CLI->>CLI: Render templates (NS, RBAC, PVC, ConfigMap, Workspace, Deployment, Service, Ingress)
+        CLI->>VC: vcluster connect -- kubectl apply -f rendered.yaml
     end
-    CLI->>CLI: Health check (wait for pods Ready)
     end
 
     Note over User: ✅ All agents running
+```
+
+---
+
+## Vault Integration Flow
+
+When `--vault` is used, `resolveVaultConfig` resolves address and token with this priority:
+
+```
+1. CLI flags (--vault-addr, --vault-token)
+2. Environment variables (VAULT_ADDR, VAULT_TOKEN)
+3. .env file (if --env-file is specified)
+```
+
+### Vault API Operations (via net/http, no SDK)
+
+| Operation | Vault API | Idempotent |
+|---|---|---|
+| Enable KV v2 | `POST /v1/sys/mounts/secret` | ✅ (400 if exists) |
+| Write KV secrets | `POST /v1/secret/data/agents/<cluster>/<agent>` | ✅ (skips if exists) |
+| Create ACL policy | `PUT /v1/sys/policies/acl/picoclaw-<cluster>-<agent>` | ✅ (overwrites) |
+| Create K8s auth role | `POST /v1/auth/kubernetes/role/picoclaw-<cluster>-<agent>` | ✅ (overwrites) |
+
+### VSO CRDs Created (in host namespace)
+
+| CRD | Name | Purpose |
+|---|---|---|
+| `VaultConnection` | `picoclaw-vault` | Points to `http://vault.vault.svc:8200` |
+| `VaultAuth` | `picoclaw-<agent>` | K8s auth method with agent's Vault role |
+| `VaultStaticSecret` | `picoclaw-<agent>-secret` | Pulls from KV v2, creates K8s Secret `<agent>-secret` |
+
+### Secret Sync Chain
+
+```
+Vault KV → VSO → K8s Secret (host NS) → vCluster fromHost sync → Pod envFrom
 ```
 
 ---
@@ -415,24 +198,25 @@ sequenceDiagram
 
 All manifests are **embedded Go templates** rendered dynamically per agent config:
 
-| Manifest | Purpose | Template Variables |
-|---|---|---|
-| `01-namespace.yaml` | `agents` NS | — |
-| `02-rbac.yaml` | SA + Crystal Wall Role (deny secrets read, deny pods/exec) | `agentName` |
-| `03-pvc.yaml` | Workspace persistence | `agentName` |
-| `04-configmap.yaml` | `config.json` + `mcp_config.json` + `ENVIRONMENT.md` | `model`, `maxTokens`, `temperature`, `channels`, `allowFrom` |
-| `06-deployment.yaml` | PicoClaw container | `agentName`, `image`, `secretName` |
-| `07-service.yaml` | ClusterIP for gateway | `agentName` |
-| `08-ingress.yaml` | Traefik ingress | `agentName`, `hostname` |
-| `09-cluster-rbac.yaml` | ClusterRole for broader K8s access | `agentName` |
-| `10-networkpolicy.yaml` | Network isolation | `agentName` |
-| `vcluster.yaml` | vCluster config with `fromHost` secret mappings | `agents[]` |
+| Template | Purpose |
+|---|---|
+| `namespace.yaml` | `agents` NS inside vCluster |
+| `rbac.yaml.tmpl` | SA + Crystal Wall Role (deny secrets read) |
+| `pvc.yaml.tmpl` | Workspace persistence |
+| `configmap.yaml.tmpl` | `config.json` + `mcp_config.json` |
+| `workspace-configmap.yaml.tmpl` | SOUL.md, IDENTITY.md, USER.md, AGENT.md, ENVIRONMENT.md |
+| `deployment.yaml.tmpl` | PicoClaw container with volume mounts |
+| `service.yaml.tmpl` | ClusterIP for gateway |
+| `ingress.yaml.tmpl` | Traefik ingress |
+| `vault-connection.yaml.tmpl` | VaultConnection CR (Vault mode only) |
+| `vault-auth.yaml.tmpl` | VaultAuth CR (Vault mode only) |
+| `vault-static-secret.yaml.tmpl` | VaultStaticSecret CR (Vault mode only) |
 
 ---
 
-## Crystal Wall RBAC (Embedded Template)
+## Crystal Wall RBAC
 
-The CLI enforces the security model from `project_specifications.md`:
+The CLI enforces security isolation per agent:
 
 ```yaml
 # Generated per agent — deny secrets read, deny pods/exec
@@ -450,14 +234,30 @@ rules:
 
 ---
 
+## Workspace Files
+
+Each agent has editable files mounted via ConfigMaps:
+
+| File | Storage | Reloadable | Purpose |
+|---|---|---|---|
+| `SOUL.md` | ConfigMap | ✅ `claw-ctl reload` | Personality, values |
+| `IDENTITY.md` | ConfigMap | ✅ | Name, purpose, model |
+| `USER.md` | ConfigMap | ✅ | User preferences |
+| `AGENT.md` | ConfigMap | ✅ | Operational rules |
+| `ENVIRONMENT.md` | ConfigMap | ✅ | K8s context, security constraints |
+| `memory/` | PVC | Persists across restarts | Agent's learned facts |
+| `skills/` | ConfigMap | ✅ `claw-ctl reload` | Custom capabilities |
+
+---
+
 ## Destroy Flow
 
 `claw-ctl destroy finance` performs:
 
-1. **vCluster**: `vcluster delete finance -n vcluster-finance`
-2. **Host NS**: `kubectl delete ns vcluster-finance`
-3. **Vault** (if Vault mode): Remove policies, auth roles, KV paths per agent
-4. **Confirmation**: Interactive prompt before destructive action
+1. **Confirmation**: `y/N` prompt
+2. **vCluster**: `vcluster delete finance -n vcluster-finance` (idempotent)
+3. **Host NS**: `kubectl delete ns vcluster-finance`
+4. VSO CRDs and Vault resources are cleaned up with the namespace
 
 ---
 
@@ -467,11 +267,11 @@ rules:
 claw-ctl/
 ├── main.go
 ├── cmd/
-│   ├── root.go              # Cobra root, global flags
-│   ├── init.go              # Interactive wizard
-│   ├── deploy.go            # Orchestrator (all phases)
-│   ├── destroy.go           # Teardown
-│   ├── add_agent.go         # Hot-add agent
+│   ├── root.go              # Cobra root, global flags, resolveVaultConfig()
+│   ├── init.go              # Interactive wizard (Bubbletea TUI)
+│   ├── deploy.go            # 4-phase orchestrator
+│   ├── destroy.go           # Teardown (y/N confirmation)
+│   ├── reload.go            # Hot-reload workspace ConfigMaps
 │   ├── status.go            # Health + pod status
 │   └── presets.go           # List presets
 ├── pkg/
@@ -482,27 +282,27 @@ claw-ctl/
 │   │   ├── types.go         # ClusterConfig, AgentConfig, ChannelConfig
 │   │   └── presets.go       # Embedded preset definitions
 │   ├── vcluster/
-│   │   └── manager.go       # Helm SDK: create, connect, delete, wait
-│   ├── vault/
-│   │   └── provisioner.go   # KV, Policy, Auth Role via Vault API
+│   │   └── manager.go       # Create (+ values), WaitReady, ApplyManifest, Connect, Delete
 │   ├── secrets/
-│   │   ├── vault_mode.go    # SA + TokenSecret + VSO CRDs
-│   │   └── env_mode.go      # Tokens → native K8s Secret
+│   │   ├── vault_mode.go    # Vault HTTP API: KV, Policy, K8s Auth, kvExists
+│   │   ├── env_mode.go      # .env → native K8s Secret
+│   │   └── filter.go        # Filter secrets by required keys
 │   ├── k8s/
-│   │   └── client.go        # Kubeconfig loader, unstructured apply
+│   │   └── client.go        # CreateNamespace, EnsureSecret (idempotent)
 │   └── manifests/
-│       ├── renderer.go      # Template engine
+│       ├── renderer.go      # Template engine + RenderVaultManifests
 │       └── embed/           # go:embed YAML templates
 │           ├── namespace.yaml
-│           ├── rbac.yaml
-│           ├── pvc.yaml
+│           ├── rbac.yaml.tmpl
+│           ├── pvc.yaml.tmpl
 │           ├── configmap.yaml.tmpl
+│           ├── workspace-configmap.yaml.tmpl
 │           ├── deployment.yaml.tmpl
-│           ├── service.yaml
+│           ├── service.yaml.tmpl
 │           ├── ingress.yaml.tmpl
-│           ├── cluster-rbac.yaml
-│           ├── networkpolicy.yaml
-│           └── vcluster.yaml.tmpl
+│           ├── vault-connection.yaml.tmpl
+│           ├── vault-auth.yaml.tmpl
+│           └── vault-static-secret.yaml.tmpl
 ├── go.mod
 ├── Makefile
 └── .goreleaser.yaml
@@ -515,11 +315,26 @@ claw-ctl/
 | `github.com/spf13/cobra` | CLI framework |
 | `github.com/charmbracelet/bubbletea` | Rich interactive TUI |
 | `github.com/charmbracelet/lipgloss` | TUI styling |
-| `github.com/hashicorp/vault/api` | Vault client (optional) |
 | `k8s.io/client-go` | K8s API via kubeconfig |
-| `k8s.io/apimachinery` | Unstructured CRD apply |
-| `helm.sh/helm/v3` | vCluster chart management |
+| `k8s.io/apimachinery` | API errors, types |
 | `gopkg.in/yaml.v3` | Config file I/O |
+| `net/http` | Vault HTTP API (no external SDK) |
+| `os/exec` | vcluster + kubectl CLI wrappers |
+
+---
+
+## Idempotency Guarantees
+
+| Component | Strategy |
+|---|---|
+| Namespace | `apierrors.IsAlreadyExists` check |
+| vCluster | Detect "already exists" in output |
+| vCluster delete | Detect "not found" in output |
+| K8s Secrets | `EnsureSecret` — create-or-update |
+| Vault KV | `kvExists` check before write |
+| Vault policy/role | PUT/POST overwrites (API idempotent) |
+| VSO CRDs | `kubectl apply` (inherently idempotent) |
+| Agent manifests | `vcluster connect -- kubectl apply` |
 
 ---
 
@@ -527,7 +342,7 @@ claw-ctl/
 
 - **GoReleaser**: Cross-compile for `linux/amd64`, `linux/arm64`, `darwin/arm64`, `darwin/amd64`
 - **GH Actions**: Build on push to main, attach binaries to GitHub Release
-- **Install**: `curl -sSfL https://github.com/ai-agent-ship-it/agent-lab/releases/latest/download/claw-ctl_$(uname -s)_$(uname -m).tar.gz | tar xz`
+- **Install**: `curl -sSfL https://github.com/ai-agent-ship-it/claw-ctl/releases/latest/download/claw-ctl_$(uname -s)_$(uname -m).tar.gz | tar xz`
 
 ---
 
@@ -536,9 +351,10 @@ claw-ctl/
 | Test | Command | Expected |
 |---|---|---|
 | Preset deploy | `claw-ctl deploy test --preset minimal` | Single agent, HTTP only, no Vault |
-| .env mode | `claw-ctl deploy test --preset financial-controller` | Secret gate collects tokens, creates native Secret |
-| Vault mode | `claw-ctl deploy test --preset devops-engineer --vault-addr https://vault.reynoso.pro` | Creates KV + Policy + Role + VSO CRDs |
+| .env mode | `claw-ctl deploy test --preset financial-controller --env-file .env` | Secret gate collects tokens, creates native Secret |
+| Vault mode | `claw-ctl deploy test --preset devops-engineer --vault` | Creates KV + Policy + Role + VSO CRDs |
+| Idempotent re-deploy | `claw-ctl deploy test --preset minimal` (twice) | Second run shows "already exists" messages |
 | Multi-agent | `claw-ctl deploy test --preset multi-team` | 3 agents isolated, each with own secret |
 | Crystal Wall | `kubectl exec` into agent pod → try `kubectl get secrets` | ❌ Denied |
-| Destroy | `claw-ctl destroy test` | NS + vCluster + Vault resources removed |
+| Destroy | `claw-ctl destroy test` | NS + vCluster removed, idempotent |
 | Status | `claw-ctl status test` | Shows pod health, secret sync, model info |
