@@ -223,6 +223,18 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 				fmt.Printf("  ✅ VSO CRDs applied — secrets will sync automatically\n")
 			}
 			os.Remove(tmpFile.Name())
+
+			// Force re-sync: delete existing K8s secret so VSO recreates it with latest Vault data
+			secretName := agent.Name + "-secret"
+			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "secret", secretName, "-n", namespace, "--ignore-not-found")
+			if output, err := delCmd.CombinedOutput(); err != nil {
+				fmt.Printf("  ⚠️  Secret cleanup: %s\n", strings.TrimSpace(string(output)))
+			} else {
+				out := strings.TrimSpace(string(output))
+				if strings.Contains(out, "deleted") {
+					fmt.Printf("  🔄 Forced secret re-sync for '%s'\n", secretName)
+				}
+			}
 		}
 	} else if secretValues != nil {
 		for _, agent := range cfg.Agents {
