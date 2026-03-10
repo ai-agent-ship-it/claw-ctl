@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
 	"fmt"
 	"strings"
@@ -19,7 +20,7 @@ var templateFuncs = template.FuncMap{
 }
 
 // RenderManifest renders a single template file with the given agent config.
-func RenderManifest(templateName string, agent config.AgentConfig) (string, error) {
+func RenderManifest(templateName string, agent config.AgentConfig, extraData ...map[string]interface{}) (string, error) {
 	data, err := templateFS.ReadFile("embed/" + templateName)
 	if err != nil {
 		return "", fmt.Errorf("template %s not found: %w", templateName, err)
@@ -38,6 +39,13 @@ func RenderManifest(templateName string, agent config.AgentConfig) (string, erro
 		"Temperature": agent.Temperature,
 		"OllamaAddr":  agent.OllamaAddr,
 		"Channels":    agent.Channels,
+	}
+
+	// Merge extra data (e.g. ConfigHash)
+	for _, extra := range extraData {
+		for k, v := range extra {
+			tmplData[k] = v
+		}
 	}
 
 	var buf bytes.Buffer
@@ -68,16 +76,25 @@ func RenderAllForAgent(agent config.AgentConfig) (map[string]string, error) {
 	}
 	results["namespace"] = ns
 
-	// Templated manifests
+	// Render configmap first to compute its hash
+	configmapContent, err := RenderManifest("configmap.yaml.tmpl", agent)
+	if err != nil {
+		return nil, fmt.Errorf("rendering configmap: %w", err)
+	}
+	results["configmap"] = configmapContent
+
+	// Compute config hash (SHA256, first 8 chars)
+	hash := sha256.Sum256([]byte(configmapContent))
+	configHash := fmt.Sprintf("%x", hash)[:8]
+
+	// Templated manifests (deployment gets the configHash)
 	templates := []struct {
 		key      string
 		filename string
 	}{
 		{"rbac", "rbac.yaml.tmpl"},
 		{"pvc", "pvc.yaml.tmpl"},
-		{"configmap", "configmap.yaml.tmpl"},
 		{"workspace-configmap", "workspace-configmap.yaml.tmpl"},
-		{"deployment", "deployment.yaml.tmpl"},
 		{"service", "service.yaml.tmpl"},
 		{"ingress", "ingress.yaml.tmpl"},
 	}
@@ -89,6 +106,15 @@ func RenderAllForAgent(agent config.AgentConfig) (map[string]string, error) {
 		}
 		results[t.key] = rendered
 	}
+
+	// Render deployment with configHash for auto-restart on config change
+	deploymentContent, err := RenderManifest("deployment.yaml.tmpl", agent, map[string]interface{}{
+		"ConfigHash": configHash,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("rendering deployment: %w", err)
+	}
+	results["deployment"] = deploymentContent
 
 	return results, nil
 }
