@@ -73,7 +73,7 @@ func (c *Client) CreateSecretFromEnv(ctx context.Context, namespace, name string
 			Namespace: namespace,
 			Labels: map[string]string{
 				"app":        "picoclaw",
-				"managed-by": "picoclaw-ctl",
+				"managed-by": "claw-ctl",
 			},
 		},
 		Data: secretData,

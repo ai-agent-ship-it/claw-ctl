@@ -14,9 +14,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "picoclaw-ctl",
+	Use:   "claw-ctl",
 	Short: "🐾 PicoClaw Agent Deployment CLI",
-	Long: `picoclaw-ctl is a CLI tool for deploying and managing PicoClaw AI agents
+	Long: `claw-ctl is a CLI tool for deploying and managing PicoClaw AI agents
 on Kubernetes using vClusters. It provides an interactive wizard, preset
 configurations, and handles vCluster lifecycle, secret management, and
 agent workspace files.

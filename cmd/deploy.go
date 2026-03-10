@@ -22,9 +22,9 @@ var deployCmd = &cobra.Command{
 	Long: `Deploy a new vCluster and provision PicoClaw agents inside it.
 
 Can be used with:
-  - A preset: picoclaw-ctl deploy finance --preset financial-controller
-  - A config file: picoclaw-ctl deploy --config picoclaw.yaml
-  - Flags: picoclaw-ctl deploy finance --agents agent-a,agent-b --model ollama/llama3.1:8b`,
+  - A preset: claw-ctl deploy finance --preset financial-controller
+  - A config file: claw-ctl deploy --config picoclaw.yaml
+  - Flags: claw-ctl deploy finance --agents agent-a,agent-b --model ollama/llama3.1:8b`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var cfg config.ClusterConfig
@@ -43,7 +43,7 @@ Can be used with:
 			// Load from preset
 			preset, ok := config.Presets[deployPreset]
 			if !ok {
-				return fmt.Errorf("unknown preset: %s (run 'picoclaw-ctl presets' to list)", deployPreset)
+				return fmt.Errorf("unknown preset: %s (run 'claw-ctl presets' to list)", deployPreset)
 			}
 			cfg = preset
 			if len(args) > 0 {

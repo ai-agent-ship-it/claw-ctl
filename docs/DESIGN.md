@@ -1,9 +1,9 @@
-# `picoclaw-ctl` — Solution Design
+# `claw-ctl` — Solution Design
 
 ## Prerequisites
 
 > [!IMPORTANT]
-> **The only hard requirement to use `picoclaw-ctl` is an LLM provider token or a local Ollama address.** Everything else is optional or handled by the CLI.
+> **The only hard requirement to use `claw-ctl` is an LLM provider token or a local Ollama address.** Everything else is optional or handled by the CLI.
 
 | Requirement | Required? | Examples |
 |---|---|---|
@@ -26,7 +26,7 @@ graph LR
   end
 
   subgraph "System Actors"
-    CLI["🐾 picoclaw-ctl<br/>(this binary)"]
+    CLI["🐾 claw-ctl<br/>(this binary)"]
     VAULT["🏦 HashiCorp Vault"]
     K8S["☸️ Kubernetes Cluster"]
     VCLUSTER["📦 vCluster"]
@@ -61,7 +61,7 @@ graph LR
 graph TB
   DEV["👨‍💻 Developer"]
 
-  subgraph "picoclaw-ctl Use Cases"
+  subgraph "claw-ctl Use Cases"
     UC1["UC-1: Deploy agent with<br/>interactive wizard"]
     UC2["UC-2: Deploy agent<br/>from preset"]
     UC3["UC-3: Deploy agent<br/>from config file"]
@@ -86,7 +86,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | Has an LLM token or Ollama address |
-| **Trigger** | `picoclaw-ctl init` |
+| **Trigger** | `claw-ctl init` |
 | **Flow** | 1. Select preset or custom → 2. Name cluster → 3. Configure agents (model, channels) → 4. Secret Gate collects required tokens → 5. Review → 6. Deploy |
 | **Postcondition** | vCluster running, agent pods healthy, secrets injected |
 
@@ -96,7 +96,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | Has LLM token + knows desired preset |
-| **Trigger** | `picoclaw-ctl deploy finance --preset financial-controller` |
+| **Trigger** | `claw-ctl deploy finance --preset financial-controller` |
 | **Flow** | 1. Load preset defaults → 2. Secret Gate prompts for required tokens → 3. Deploy |
 | **Postcondition** | Agent running with preset config |
 
@@ -106,7 +106,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | Has a `picoclaw.yaml` (created via wizard or manually) |
-| **Trigger** | `picoclaw-ctl deploy --config picoclaw.yaml` |
+| **Trigger** | `claw-ctl deploy --config picoclaw.yaml` |
 | **Flow** | 1. Parse config → 2. Validate completeness → 3. Secret Gate if tokens missing → 4. Deploy |
 | **Postcondition** | Agent(s) running per config |
 
@@ -116,7 +116,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | vCluster already running |
-| **Trigger** | `picoclaw-ctl add-agent finance agent-reportes` |
+| **Trigger** | `claw-ctl add-agent finance agent-reportes` |
 | **Flow** | 1. Detect existing cluster → 2. Wizard for new agent config → 3. Secret Gate → 4. Generate + apply new agent manifests → 5. Patch vCluster secret sync |
 | **Postcondition** | New agent pod running alongside existing ones |
 
@@ -126,7 +126,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | vCluster exists |
-| **Trigger** | `picoclaw-ctl status finance` |
+| **Trigger** | `claw-ctl status finance` |
 | **Output** | Cluster health, per-agent pod status, secret sync state, model info, channel connections |
 
 ### UC-6: Destroy Cluster
@@ -135,7 +135,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | vCluster exists |
-| **Trigger** | `picoclaw-ctl destroy finance` |
+| **Trigger** | `claw-ctl destroy finance` |
 | **Flow** | 1. Confirmation prompt → 2. Delete vCluster + NS → 3. Clean Vault (if used) → 4. Remove local config |
 | **Postcondition** | All resources removed |
 
@@ -145,7 +145,7 @@ graph TB
 |---|---|
 | **Actor** | Developer |
 | **Precondition** | None |
-| **Trigger** | `picoclaw-ctl presets` |
+| **Trigger** | `claw-ctl presets` |
 | **Output** | Table of presets with agents, models, channels |
 
 ---
@@ -154,14 +154,14 @@ graph TB
 
 | Command | Description |
 |---|---|
-| `picoclaw-ctl init` | Interactive wizard (preset or custom) |
-| `picoclaw-ctl deploy <name> --preset <p>` | Deploy from preset |
-| `picoclaw-ctl deploy --config picoclaw.yaml` | Deploy from saved config |
-| `picoclaw-ctl destroy <name>` | Full teardown (vCluster + Vault) |
-| `picoclaw-ctl add-agent <cluster> <agent>` | Hot-add agent to running vCluster |
-| `picoclaw-ctl reload <cluster> [agent]` | Push workspace file changes (SOUL, skills, etc.) without restart |
-| `picoclaw-ctl status <name>` | Agent health, pod status, secret sync |
-| `picoclaw-ctl presets` | List available presets |
+| `claw-ctl init` | Interactive wizard (preset or custom) |
+| `claw-ctl deploy <name> --preset <p>` | Deploy from preset |
+| `claw-ctl deploy --config picoclaw.yaml` | Deploy from saved config |
+| `claw-ctl destroy <name>` | Full teardown (vCluster + Vault) |
+| `claw-ctl add-agent <cluster> <agent>` | Hot-add agent to running vCluster |
+| `claw-ctl reload <cluster> [agent]` | Push workspace file changes (SOUL, skills, etc.) without restart |
+| `claw-ctl status <name>` | Agent health, pod status, secret sync |
+| `claw-ctl presets` | List available presets |
 
 ---
 
@@ -176,7 +176,7 @@ graph TB
 | `minimal` | agent | llama3.1:8b | HTTP only | API-only agent |
 | `custom` | — | — | — | Full manual wizard |
 
-Presets are embedded YAML in the binary via `go:embed`. Users can also save custom presets with `picoclaw-ctl init` → `[S]ave`.
+Presets are embedded YAML in the binary via `go:embed`. Users can also save custom presets with `claw-ctl init` → `[S]ave`.
 
 ---
 
@@ -184,7 +184,7 @@ Presets are embedded YAML in the binary via `go:embed`. Users can also save cust
 
 ```mermaid
 flowchart TD
-  START["picoclaw-ctl init"] --> PRESET["🎭 Choose preset or Custom"]
+  START["claw-ctl init"] --> PRESET["🎭 Choose preset or Custom"]
 
   PRESET -->|"Preset"| LOAD["Load preset defaults"]
   PRESET -->|"Custom"| CUSTOM["Full wizard:<br/>agents, models, channels, tokens, temp"]
@@ -292,7 +292,7 @@ graph LR
     FILES["workspace/<br/>agent-financiero/<br/>SOUL.md, IDENTITY.md,<br/>skills/, memory/"]
   end
 
-  subgraph "picoclaw-ctl"
+  subgraph "claw-ctl"
     RENDER["Render ConfigMaps<br/>from workspace files"]
   end
 
@@ -315,13 +315,13 @@ graph LR
 
 | File | Storage | Editable | Reloadable | Purpose |
 |---|---|---|---|---|
-| `SOUL.md` | ConfigMap | ✅ Edit on disk, redeploy | ✅ `picoclaw-ctl reload` | Personality, values |
+| `SOUL.md` | ConfigMap | ✅ Edit on disk, redeploy | ✅ `claw-ctl reload` | Personality, values |
 | `IDENTITY.md` | ConfigMap | ✅ | ✅ | Name, purpose, version |
 | `USER.md` | ConfigMap | ✅ | ✅ | User preferences |
 | `AGENT.md` | ConfigMap | ✅ | ✅ | Operational rules |
 | `ENVIRONMENT.md` | ConfigMap (generated) | ⚠️ Auto-generated by CLI | ✅ | K8s context, installed CRDs |
 | `memory/` | PVC (persistent) | ✅ Agent writes here | Persists across restarts | Agent's learned facts |
-| `skills/` | ConfigMap | ✅ | ✅ `picoclaw-ctl reload` | Custom capabilities |
+| `skills/` | ConfigMap | ✅ | ✅ `claw-ctl reload` | Custom capabilities |
 
 > [!TIP]
 > `ENVIRONMENT.md` is **auto-generated** by the CLI based on what the cluster has installed (Traefik, CNPG, Redis, etc.). The others are fully user-controlled.
@@ -333,20 +333,20 @@ graph LR
 vim workspace/agent-financiero/SOUL.md
 
 # Push changes to the running agent (no restart needed)
-picoclaw-ctl reload finance agent-financiero
+claw-ctl reload finance agent-financiero
 
 # Or reload all agents in a cluster
-picoclaw-ctl reload finance --all
+claw-ctl reload finance --all
 ```
 
 The `reload` command updates the ConfigMaps in-place. PicoClaw watches for file changes and reloads its context automatically.
 
 ### Default Workspace (Generated by Wizard)
 
-When using a preset or the wizard, `picoclaw-ctl init` generates a default workspace with sensible files:
+When using a preset or the wizard, `claw-ctl init` generates a default workspace with sensible files:
 
 ```bash
-$ picoclaw-ctl init
+$ claw-ctl init
   ...
   ✅ Workspace generated at ./workspace/agent-financiero/
   📝 Edit SOUL.md and IDENTITY.md to customize your agent's personality.
@@ -357,12 +357,12 @@ $ picoclaw-ctl init
 ```mermaid
 sequenceDiagram
     participant User
-    participant CLI as picoclaw-ctl
+    participant CLI as claw-ctl
     participant K8s as Host K8s
     participant Helm as Helm SDK
     participant Vault as Vault (optional)
 
-    User->>CLI: picoclaw-ctl deploy finance --preset financial-controller
+    User->>CLI: claw-ctl deploy finance --preset financial-controller
 
     rect rgb(40, 40, 60)
     Note over CLI: Phase 1: Preflight
@@ -452,7 +452,7 @@ rules:
 
 ## Destroy Flow
 
-`picoclaw-ctl destroy finance` performs:
+`claw-ctl destroy finance` performs:
 
 1. **vCluster**: `vcluster delete finance -n vcluster-finance`
 2. **Host NS**: `kubectl delete ns vcluster-finance`
@@ -464,7 +464,7 @@ rules:
 ## Go Package Structure
 
 ```
-picoclaw-ctl/
+claw-ctl/
 ├── main.go
 ├── cmd/
 │   ├── root.go              # Cobra root, global flags
@@ -527,7 +527,7 @@ picoclaw-ctl/
 
 - **GoReleaser**: Cross-compile for `linux/amd64`, `linux/arm64`, `darwin/arm64`, `darwin/amd64`
 - **GH Actions**: Build on push to main, attach binaries to GitHub Release
-- **Install**: `curl -sSfL https://github.com/ai-agent-ship-it/agent-lab/releases/latest/download/picoclaw-ctl_$(uname -s)_$(uname -m).tar.gz | tar xz`
+- **Install**: `curl -sSfL https://github.com/ai-agent-ship-it/agent-lab/releases/latest/download/claw-ctl_$(uname -s)_$(uname -m).tar.gz | tar xz`
 
 ---
 
@@ -535,10 +535,10 @@ picoclaw-ctl/
 
 | Test | Command | Expected |
 |---|---|---|
-| Preset deploy | `picoclaw-ctl deploy test --preset minimal` | Single agent, HTTP only, no Vault |
-| .env mode | `picoclaw-ctl deploy test --preset financial-controller` | Secret gate collects tokens, creates native Secret |
-| Vault mode | `picoclaw-ctl deploy test --preset devops-engineer --vault-addr https://vault.reynoso.pro` | Creates KV + Policy + Role + VSO CRDs |
-| Multi-agent | `picoclaw-ctl deploy test --preset multi-team` | 3 agents isolated, each with own secret |
+| Preset deploy | `claw-ctl deploy test --preset minimal` | Single agent, HTTP only, no Vault |
+| .env mode | `claw-ctl deploy test --preset financial-controller` | Secret gate collects tokens, creates native Secret |
+| Vault mode | `claw-ctl deploy test --preset devops-engineer --vault-addr https://vault.reynoso.pro` | Creates KV + Policy + Role + VSO CRDs |
+| Multi-agent | `claw-ctl deploy test --preset multi-team` | 3 agents isolated, each with own secret |
 | Crystal Wall | `kubectl exec` into agent pod → try `kubectl get secrets` | ❌ Denied |
-| Destroy | `picoclaw-ctl destroy test` | NS + vCluster + Vault resources removed |
-| Status | `picoclaw-ctl status test` | Shows pod health, secret sync, model info |
+| Destroy | `claw-ctl destroy test` | NS + vCluster + Vault resources removed |
+| Status | `claw-ctl status test` | Shows pod health, secret sync, model info |

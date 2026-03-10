@@ -21,7 +21,7 @@ var presetsCmd = &cobra.Command{
 			fmt.Printf("  %-24s %s\n", name, desc)
 		}
 		fmt.Println()
-		fmt.Println("  Usage: picoclaw-ctl deploy <cluster-name> --preset <preset-name>")
+		fmt.Println("  Usage: claw-ctl deploy <cluster-name> --preset <preset-name>")
 		fmt.Println()
 	},
 }

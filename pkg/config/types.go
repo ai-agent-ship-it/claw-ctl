@@ -1,6 +1,6 @@
 package config
 
-// ClusterConfig is the top-level configuration for a picoclaw-ctl deployment.
+// ClusterConfig is the top-level configuration for a claw-ctl deployment.
 // It maps directly to picoclaw.yaml.
 type ClusterConfig struct {
 	Cluster string        `yaml:"cluster" json:"cluster"`

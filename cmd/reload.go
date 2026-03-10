@@ -16,8 +16,8 @@ ConfigMaps in-place. PicoClaw watches for file changes and reloads
 its context automatically.
 
 Examples:
-  picoclaw-ctl reload finance agent-financiero   # Reload one agent
-  picoclaw-ctl reload finance --all               # Reload all agents`,
+  claw-ctl reload finance agent-financiero   # Reload one agent
+  claw-ctl reload finance --all               # Reload all agents`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		clusterName := args[0]
