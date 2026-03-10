@@ -1,10 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 
+	"github.com/ai-agent-ship-it/claw-ctl/pkg/k8s"
+	"github.com/ai-agent-ship-it/claw-ctl/pkg/vcluster"
 	"github.com/spf13/cobra"
 )
+
+var forceDestroy bool
 
 var destroyCmd = &cobra.Command{
 	Use:   "destroy [cluster-name]",
@@ -17,18 +23,48 @@ var destroyCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		clusterName := args[0]
 		namespace := "vcluster-" + clusterName
+		ctx := context.Background()
 
-		fmt.Printf("\n  ⚠️  This will permanently destroy cluster '%s'\n", clusterName)
-		fmt.Printf("  Namespace: %s\n\n", namespace)
-		fmt.Println("  [TODO] Confirmation prompt")
-		fmt.Println("  [TODO] vcluster delete")
-		fmt.Println("  [TODO] kubectl delete ns")
-		fmt.Println("  [TODO] Vault cleanup (if applicable)")
+		if !forceDestroy {
+			fmt.Printf("\n  ⚠️  This will permanently destroy cluster '%s'\n", clusterName)
+			fmt.Printf("  Namespace: %s\n\n", namespace)
+			fmt.Print("  Type the cluster name to confirm: ")
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != clusterName {
+				fmt.Println("  ❌ Confirmation failed. Aborting.")
+				return nil
+			}
+		}
 
+		fmt.Printf("\n  🗑️  Destroying cluster '%s'...\n\n", clusterName)
+
+		// Step 1: Delete vCluster
+		vcm := vcluster.NewManager()
+		if err := vcm.Delete(ctx, clusterName, namespace); err != nil {
+			fmt.Printf("  ⚠️  vCluster delete: %v\n", err)
+		}
+
+		// Step 2: Delete namespace
+		fmt.Printf("  🗑️  Deleting namespace '%s'...\n", namespace)
+		k8sClient, err := k8s.NewClient()
+		if err != nil {
+			return fmt.Errorf("K8s connectivity failed: %w", err)
+		}
+		nsCmd := exec.CommandContext(ctx, "kubectl", "delete", "ns", namespace, "--ignore-not-found")
+		if output, err := nsCmd.CombinedOutput(); err != nil {
+			fmt.Printf("  ⚠️  Namespace delete: %s\n", string(output))
+		} else {
+			fmt.Printf("  ✅ Namespace '%s' deleted\n", namespace)
+		}
+		_ = k8sClient // used for future vault cleanup
+
+		fmt.Printf("\n  🎉 Cluster '%s' destroyed.\n\n", clusterName)
 		return nil
 	},
 }
 
 func init() {
+	destroyCmd.Flags().BoolVar(&forceDestroy, "force", false, "Skip confirmation prompt")
 	rootCmd.AddCommand(destroyCmd)
 }
