@@ -22,17 +22,15 @@ spec:
           command: ["sh", "-c"]
           args:
             - |
-              cp /config-template/config.json /tmp/config.json.tpl
-              cp /config-template/mcp_config.json /tmp/mcp_config.json.tpl
-              while IFS='=' read -r key val; do
-                [ -z "$key" ] && continue
-                sed -i "s|\${${key}}|${val}|g" /tmp/config.json.tpl
-                sed -i "s|\${${key}}|${val}|g" /tmp/mcp_config.json.tpl
-              done <<EOF
-              $(env | grep -E '^[A-Z_]+=' | grep -v '^_=')
-              EOF
-              cp /tmp/config.json.tpl /resolved-config/config.json
-              cp /tmp/mcp_config.json.tpl /resolved-config/mcp_config.json
+              cp /config-template/config.json /resolved-config/config.json
+              cp /config-template/mcp_config.json /resolved-config/mcp_config.json
+              for var in TELEGRAM_BOT_TOKEN DISCORD_BOT_TOKEN WHATSAPP_API_TOKEN GEMINI_API_KEY GITHUB_ACCESS_TOKEN; do
+                eval val=\$$var
+                if [ -n "$val" ]; then
+                  sed -i "s#\${${var}}#${val}#g" /resolved-config/config.json
+                  sed -i "s#\${${var}}#${val}#g" /resolved-config/mcp_config.json
+                fi
+              done
               echo "Config resolved successfully"
           envFrom:
             - secretRef:
