@@ -46,19 +46,23 @@ func (v *VaultProvisioner) ProvisionAgent(clusterName string, agent config.Agent
 		fmt.Printf("  ℹ️  KV engine: %v (may already be enabled)\n", err)
 	}
 
-	// Step 2: Write initial secret data at the KV path
-	fmt.Printf("  🏦 Vault: Creating KV path: secret/%s\n", kvPath)
-	secretData := map[string]interface{}{
-		"managed_by": "claw-ctl",
-		"agent":      agent.Name,
-		"cluster":    clusterName,
-	}
-	// Add required secrets as placeholders
-	for _, key := range agent.RequiredSecrets() {
-		secretData[key] = "REPLACE_ME"
-	}
-	if err := v.writeKV(kvPath, secretData); err != nil {
-		return fmt.Errorf("failed to write KV: %w", err)
+	// Step 2: Write initial secret data at the KV path (only if it doesn't exist)
+	fmt.Printf("  🏦 Vault: Checking KV path: secret/%s\n", kvPath)
+	if v.kvExists(kvPath) {
+		fmt.Printf("  ℹ️  KV path already exists, skipping (won't overwrite)\n")
+	} else {
+		fmt.Printf("  🏦 Vault: Creating KV path: secret/%s\n", kvPath)
+		secretData := map[string]interface{}{
+			"managed_by": "claw-ctl",
+			"agent":      agent.Name,
+			"cluster":    clusterName,
+		}
+		for _, key := range agent.RequiredSecrets() {
+			secretData[key] = "REPLACE_ME"
+		}
+		if err := v.writeKV(kvPath, secretData); err != nil {
+			return fmt.Errorf("failed to write KV: %w", err)
+		}
 	}
 
 	// Step 3: Create policy granting read access to this path
@@ -155,6 +159,11 @@ func (v *VaultProvisioner) writeKV(path string, data map[string]interface{}) err
 	}
 	_, err := v.vaultRequest("POST", "secret/data/"+path, payload)
 	return err
+}
+
+func (v *VaultProvisioner) kvExists(path string) bool {
+	_, err := v.vaultRequest("GET", "secret/data/"+path, nil)
+	return err == nil
 }
 
 func (v *VaultProvisioner) deleteKV(path string) error {
