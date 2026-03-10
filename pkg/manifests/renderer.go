@@ -75,6 +75,7 @@ func RenderAllForAgent(agent config.AgentConfig) (map[string]string, error) {
 		{"rbac", "rbac.yaml.tmpl"},
 		{"pvc", "pvc.yaml.tmpl"},
 		{"configmap", "configmap.yaml.tmpl"},
+		{"workspace-configmap", "workspace-configmap.yaml.tmpl"},
 		{"deployment", "deployment.yaml.tmpl"},
 		{"service", "service.yaml.tmpl"},
 		{"ingress", "ingress.yaml.tmpl"},

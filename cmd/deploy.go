@@ -220,7 +220,7 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 		tmpPath := tmpFile.Name()
 
 		// Write all manifests separated by ---
-		order := []string{"namespace", "rbac", "pvc", "configmap", "deployment", "service", "ingress"}
+		order := []string{"namespace", "rbac", "pvc", "configmap", "workspace-configmap", "deployment", "service", "ingress"}
 		for _, key := range order {
 			if content, ok := rendered[key]; ok {
 				tmpFile.WriteString("---\n")
