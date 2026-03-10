@@ -175,10 +175,11 @@ func (v *VaultProvisioner) deletePolicy(name string) error {
 	return err
 }
 
-func (v *VaultProvisioner) createK8sAuthRole(roleName, policyName, namespace, serviceAccount string) error {
+func (v *VaultProvisioner) createK8sAuthRole(roleName, policyName, clusterName, agentName string) error {
+	namespace := "vcluster-" + clusterName
 	payload := map[string]interface{}{
-		"bound_service_account_names":      []string{serviceAccount},
-		"bound_service_account_namespaces": []string{"vcluster-" + namespace, "agents"},
+		"bound_service_account_names":      []string{"default", agentName + "-sa"},
+		"bound_service_account_namespaces": []string{namespace},
 		"policies":                         []string{policyName},
 		"ttl":                              "24h",
 	}
