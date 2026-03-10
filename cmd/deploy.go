@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/ai-agent-ship-it/claw-ctl/pkg/config"
@@ -182,6 +183,29 @@ func runDeploy(cfg config.ClusterConfig, secretValues map[string]string) error {
 			if err := vp.ProvisionAgent(cfg.Cluster, agent); err != nil {
 				return err
 			}
+
+			// Render and apply VSO CRDs (VaultConnection, VaultAuth, VaultStaticSecret)
+			// These are applied to the HOST namespace so VSO creates K8s Secrets
+			fmt.Printf("  📜 Applying VSO CRDs for '%s' in host namespace...\n", agent.Name)
+			vsoManifest, err := manifests.RenderVaultManifests(cfg.Cluster, namespace, agent)
+			if err != nil {
+				return fmt.Errorf("failed to render VSO manifests: %w", err)
+			}
+
+			tmpFile, err := os.CreateTemp("", fmt.Sprintf("claw-ctl-vso-%s-*.yaml", agent.Name))
+			if err != nil {
+				return err
+			}
+			tmpFile.WriteString(vsoManifest)
+			tmpFile.Close()
+
+			vsoCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", tmpFile.Name())
+			if output, err := vsoCmd.CombinedOutput(); err != nil {
+				fmt.Printf("  ⚠️  VSO CRD apply: %s\n", strings.TrimSpace(string(output)))
+			} else {
+				fmt.Printf("  ✅ VSO CRDs applied — secrets will sync automatically\n")
+			}
+			os.Remove(tmpFile.Name())
 		}
 	} else if secretValues != nil {
 		for _, agent := range cfg.Agents {

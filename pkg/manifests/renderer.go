@@ -91,3 +91,43 @@ func RenderAllForAgent(agent config.AgentConfig) (map[string]string, error) {
 
 	return results, nil
 }
+
+// RenderVaultManifests renders the VSO CRD templates (VaultConnection, VaultAuth, VaultStaticSecret)
+// for a given agent in the host namespace. These are applied on the host cluster, not inside the vCluster.
+func RenderVaultManifests(clusterName, namespace string, agent config.AgentConfig) (string, error) {
+	templates := []string{
+		"vault-connection.yaml.tmpl",
+		"vault-auth.yaml.tmpl",
+		"vault-static-secret.yaml.tmpl",
+	}
+
+	tmplData := map[string]interface{}{
+		"AgentName":   agent.Name,
+		"ClusterName": clusterName,
+		"Namespace":   namespace,
+	}
+
+	var combined strings.Builder
+	for _, tmplFile := range templates {
+		data, err := templateFS.ReadFile("embed/" + tmplFile)
+		if err != nil {
+			return "", fmt.Errorf("vault template %s not found: %w", tmplFile, err)
+		}
+
+		tmpl, err := template.New(tmplFile).Funcs(templateFuncs).Parse(string(data))
+		if err != nil {
+			return "", fmt.Errorf("failed to parse vault template %s: %w", tmplFile, err)
+		}
+
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, tmplData); err != nil {
+			return "", fmt.Errorf("failed to render vault template %s: %w", tmplFile, err)
+		}
+
+		combined.WriteString("---\n")
+		combined.WriteString(buf.String())
+		combined.WriteString("\n")
+	}
+
+	return combined.String(), nil
+}

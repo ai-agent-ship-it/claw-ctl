@@ -1,0 +1,13 @@
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: picoclaw-{{ .AgentName }}
+  namespace: {{ .Namespace }}
+spec:
+  method: kubernetes
+  mount: kubernetes
+  vaultConnectionRef: picoclaw-vault
+  kubernetes:
+    role: picoclaw-{{ .ClusterName }}-{{ .AgentName }}
+    serviceAccount: default
+    tokenExpirationSeconds: 600
