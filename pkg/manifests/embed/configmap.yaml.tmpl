@@ -6,22 +6,44 @@ metadata:
 data:
   config.json: |
     {
-      "gateway": {
-        "allowPublicBind": true,
-        "listen": "0.0.0.0:18790"
-      },
+      "model_list": [
+        {{- if hasPrefix .Model "gemini/" }}
+        {
+          "model_name": "{{ .Model }}",
+          "model": "{{ .Model }}",
+          "api_base": "https://generativelanguage.googleapis.com/v1beta",
+          "api_key": "${GEMINI_API_KEY}"
+        }
+        {{- else if hasPrefix .Model "ollama/" }}
+        {
+          "model_name": "{{ .Model }}",
+          "model": "{{ .Model }}",
+          "api_base": "{{ if .OllamaAddr }}{{ .OllamaAddr }}/v1{{ else }}http://ollama.default.svc:11434/v1{{ end }}",
+          "api_key": "not-needed"
+        }
+        {{- else }}
+        {
+          "model_name": "{{ .Model }}",
+          "model": "{{ .Model }}"
+        }
+        {{- end }}
+      ],
       "agents": {
         "defaults": {
           "workspace": "/home/picoclaw/.picoclaw/workspace",
           "restrict_to_workspace": false,
-          "model": "{{ .Model }}",
           "model_name": "{{ .Model }}",
           "max_tokens": {{ .MaxTokens }},
           "temperature": {{ .Temperature }}
         }
       },
+      "gateway": {
+        "host": "0.0.0.0",
+        "port": 18790
+      },
       "tools": {
         "exec": {
+          "enabled": true,
           "enable_deny_patterns": true,
           "custom_deny_patterns": [
             "(?i)-n\\s+agents",
@@ -32,8 +54,7 @@ data:
           ]
         },
         "mcp": {
-          "enabled": true,
-          "config_path": "/home/picoclaw/.picoclaw/mcp_config.json"
+          "enabled": true
         }
       },
       "channels": {
@@ -59,28 +80,10 @@ data:
         }
         {{- end }}
       },
-      "model_list": [
-        {{- if hasPrefix .Model "gemini/" }}
-        {
-          "model_name": "{{ .Model }}",
-          "model": "{{ .Model }}",
-          "api_base": "https://generativelanguage.googleapis.com/v1beta",
-          "api_key": "${GEMINI_API_KEY}"
-        }
-        {{- else if hasPrefix .Model "ollama/" }}
-        {
-          "model_name": "{{ .Model }}",
-          "model": "{{ .Model }}",
-          "api_base": "{{ if .OllamaAddr }}{{ .OllamaAddr }}/v1{{ else }}http://ollama.default.svc:11434/v1{{ end }}",
-          "api_key": "not-needed"
-        }
-        {{- else }}
-        {
-          "model_name": "{{ .Model }}",
-          "model": "{{ .Model }}"
-        }
-        {{- end }}
-      ]
+      "heartbeat": {
+        "enabled": true,
+        "interval": 30
+      }
     }
   mcp_config.json: |
     {
