@@ -54,16 +54,7 @@ data:
           ]
         },
         "mcp": {
-          "enabled": true,
-          "mcp_servers": {
-            "github": {
-              "command": "npx",
-              "args": ["-y", "@modelcontextprotocol/server-github"],
-              "env": {
-                "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_ACCESS_TOKEN}"
-              }
-            }
-          }
+          "enabled": true
         }
       },
       "channels": {
@@ -96,7 +87,7 @@ data:
     }
   mcp_config.json: |
     {
-      "mcpServers": {
+      "mcp_servers": {
         "github": {
           "command": "npx",
           "args": ["-y", "@modelcontextprotocol/server-github"],
