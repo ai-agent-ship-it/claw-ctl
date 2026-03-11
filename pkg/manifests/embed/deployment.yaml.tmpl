@@ -18,19 +18,12 @@ spec:
       serviceAccountName: {{ .AgentName }}-sa
       initContainers:
         - name: config-resolver
-          image: ghcr.io/ai-agent-ship-it/picoclaw:latest
+          image: bhgedigital/envsubst:latest
           command: ["sh", "-c"]
           args:
             - |
-              cp /config-template/config.json /resolved-config/config.json
-              cp /config-template/mcp_config.json /resolved-config/mcp_config.json
-              for var in TELEGRAM_BOT_TOKEN DISCORD_BOT_TOKEN WHATSAPP_API_TOKEN GEMINI_API_KEY GITHUB_ACCESS_TOKEN; do
-                eval val=\$$var
-                if [ -n "$val" ]; then
-                  sed -i "s#\${${var}}#${val}#g" /resolved-config/config.json
-                  sed -i "s#\${${var}}#${val}#g" /resolved-config/mcp_config.json
-                fi
-              done
+              envsubst < /config-template/config.json > /resolved-config/config.json
+              envsubst < /config-template/mcp_config.json > /resolved-config/mcp_config.json
               echo "Config resolved successfully"
           envFrom:
             - secretRef:
