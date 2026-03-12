@@ -23,7 +23,6 @@ spec:
           args:
             - |
               envsubst < /config-template/config.json > /resolved-config/config.json
-              envsubst < /config-template/mcp_config.json > /resolved-config/mcp_config.json
               echo "Config resolved successfully"
           envFrom:
             - secretRef:
@@ -46,9 +45,7 @@ spec:
             - name: resolved-config
               mountPath: /root/.picoclaw/config.json
               subPath: config.json
-            - name: resolved-config
-              mountPath: /root/.picoclaw/mcp_config.json
-              subPath: mcp_config.json
+
             - name: workspace-data
               mountPath: /root/.picoclaw/workspace
             - name: workspace-files
